@@ -9,12 +9,17 @@
  * registry that names them, credits them, and records their licence. Keeping
  * provenance next to the data means the credit cannot quietly drift away from
  * the files it describes.
+ *
+ * Licensing is deliberately per-instrument rather than one blanket statement,
+ * because it genuinely differs: two sets are public domain and one is copyleft.
+ * See README for what that means for the repo.
  */
 
 import { ACOUSTIC_NOTES } from "./acoustic";
+import { CLASSICAL_NOTES } from "./classical";
 import { ELECTRIC_NOTES } from "./electric";
 
-export type InstrumentId = "acoustic" | "electric";
+export type InstrumentId = "acoustic" | "classical" | "electric";
 
 export interface Instrument {
   id: InstrumentId;
@@ -32,14 +37,18 @@ export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
   acoustic: {
     id: "acoustic",
     label: "Acoustic",
-    // Said plainly because it matters: this is a nylon-strung classical
-    // guitar. It is a real acoustic, but a steel-string dreadnought is what
-    // most strumming patterns are written for and it sounds noticeably
-    // different. See README for why a steel-string is not bundled.
-    blurb: "Nylon-string classical guitar. Warm and round — lovely fingerpicked, mellower than a steel-string for strumming.",
+    blurb: "Steel-string dreadnought. Bright and jangly — the sound most strumming patterns are written for.",
+    credit: "FreePats FS Seagull steel-string, from samples by Gary Campion (FlameStudios), 2008",
+    licence: "GPL-3.0-or-later",
+    notes: ACOUSTIC_NOTES,
+  },
+  classical: {
+    id: "classical",
+    label: "Classical",
+    blurb: "Nylon-string classical guitar. Warm and round — lovely fingerpicked, mellower for strumming.",
     credit: "FreePats Spanish classical guitar, recorded by roberto@zenvoid.org, 2008",
     licence: "CC0 1.0",
-    notes: ACOUSTIC_NOTES,
+    notes: CLASSICAL_NOTES,
   },
   electric: {
     id: "electric",

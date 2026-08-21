@@ -17,8 +17,13 @@ Nothing else in the app needs to know it exists.
 
 Only samples the chord library can actually produce are copied, which is what
 keeps each instrument around 2 MB instead of the full set.
+
+WAV-based libraries are re-encoded to FLAC on the way in. It is lossless
+(verified byte-identical on round-trip) and a decaying guitar note is mostly
+near-silence, so it compresses to roughly 15% — the difference between a 4 MB
+instrument and a 0.6 MB one. Needs afconvert (macOS) or ffmpeg.
 """
-import os, re, shutil, sys
+import os, re, shutil, subprocess, sys
 
 TUNING = [40, 45, 50, 55, 59, 64]  # standard tuning, low E first
 
@@ -44,6 +49,21 @@ def parse_sfz(path):
             lo, hi, kc = int(d["lokey"]), int(d["hikey"]), int(d["pitch_keycenter"])
         regions.append((lo, hi, kc, d["sample"]))
     return regions
+
+
+def emit_sample(src: str, dest: str) -> None:
+    """Copy a FLAC straight through; transcode anything else losslessly."""
+    if src.lower().endswith(".flac"):
+        shutil.copy(src, dest)
+        return
+    if shutil.which("afconvert"):
+        subprocess.run(["afconvert", "-f", "flac", "-d", "flac", src, dest],
+                       check=True, capture_output=True)
+    elif shutil.which("ffmpeg"):
+        subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-i", src,
+                        "-c:a", "flac", dest], check=True)
+    else:
+        sys.exit("Need afconvert (macOS) or ffmpeg to convert non-FLAC samples.")
 
 
 TEMPLATE = '''/**
@@ -84,7 +104,7 @@ def main(inst, base):
         _, _, centre, sample = match[0]
         dest = f"{centre}.flac"
         if dest not in copied:
-            shutil.copy(os.path.join(base, sample), os.path.join(out_dir, dest))
+            emit_sample(os.path.join(base, sample), os.path.join(out_dir, dest))
             copied.add(dest)
         mapping[note] = centre
 
@@ -94,7 +114,19 @@ def main(inst, base):
     )
     text = open(os.path.join(base, readme)).read() if readme else ""
     name = text.strip().splitlines()[0] if text else inst
-    licence = "CC0 1.0 public domain" if "CC0" in text else "see library README"
+    if "CC0" in text:
+        licence = "CC0 1.0 public domain"
+    elif "GNU General Public License" in text:
+        licence = "GPL-3.0-or-later, with the FreePats sound exception"
+    else:
+        licence = "see library README"
+
+    # Carry the library's own licence files through. For a copyleft set this is
+    # an obligation, not a courtesy: redistributing the samples means shipping
+    # the licence with them.
+    for name in os.listdir(base):
+        if name.lower() in ("license.txt", "licence.txt", "gpl.txt", "copying", "copying.txt"):
+            shutil.copy(os.path.join(base, name), os.path.join(out_dir, name.upper().replace(".TXT", ".txt")))
     credit = next((l.strip() for l in text.splitlines() if "recorded" in l.lower() or "sampling" in l.lower()), "")
 
     body = "\n".join(f"  {n}: {c}," for n, c in sorted(mapping.items()))

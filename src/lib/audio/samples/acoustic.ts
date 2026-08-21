@@ -2,9 +2,9 @@
  * GENERATED FILE - do not edit by hand.
  * Rebuild: python3 scripts/build-samples.py acoustic <library-dir>
  *
- * Spanish classical guitar
- * Sound samples recorded from a Spanish classical guitar on 2008. Created by
- * Licence: CC0 1.0 public domain
+ * readme.txt
+ * 
+ * Licence: GPL-3.0-or-later, with the FreePats sound exception
  *
  * Maps every MIDI note the chord library can produce to the pitch centre of
  * the recording covering it. Where the two differ the sampler resamples by
@@ -13,29 +13,29 @@
 
 export const ACOUSTIC_NOTES: Record<number, number> = {
   40: 40,
-  41: 41,
-  42: 43,
-  43: 43,
+  41: 40,
+  42: 40,
+  43: 45,
   45: 45,
-  46: 47,
-  47: 47,
-  48: 48,
-  49: 50,
-  50: 50,
-  51: 52,
-  52: 52,
-  53: 53,
-  54: 54,
-  55: 55,
+  46: 45,
+  47: 45,
+  48: 51,
+  49: 51,
+  50: 51,
+  51: 51,
+  52: 51,
+  53: 51,
+  54: 56,
+  55: 56,
   56: 56,
-  57: 57,
-  58: 58,
-  59: 59,
+  57: 56,
+  58: 60,
+  59: 60,
   60: 60,
-  61: 61,
-  62: 62,
-  64: 64,
-  65: 65,
+  61: 60,
+  62: 63,
+  64: 63,
+  65: 66,
   66: 66,
-  67: 67,
+  67: 66,
 };

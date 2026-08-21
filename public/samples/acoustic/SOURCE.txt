@@ -1,24 +1,50 @@
-Spanish classical guitar
-------------------------
+FSS Steel-String Acoustic Guitar
+--------------------------------
 
-Version 2019-06-18
+Sound bank assembled by roberto@zenvoid.org for the FreePats project, using
+samples from the "FS Seagull Steel String Acoustic Guitar" by FlameStudios.
+  http://freepats.zenvoid.org/Guitar/steel-acoustic-guitar.html
 
-Sound samples recorded from a Spanish classical guitar on 2008. Created by
-roberto@zenvoid.org for the FreePats project.
+Copyright 2008 Gary Campion
+Modified 2016-2020 by roberto@zenvoid.org for the FreePats project.
+Modified 2026 for StrumLab: reduced to the pitch centres the chord library can
+reach, and re-encoded from WAV to FLAC (lossless, verified byte-identical on
+round-trip).
 
-Recorded with an AKG Perception 120 microphone and processed using free
-software tools. The recording conditions were far from ideal, so several
-filters have been applied to reduce noise and improve sound.
+LICENCE
+-------
+GNU General Public License version 3 or later. The full text is in GPL.txt in
+this directory.
 
-This sound bank, in several formats and qualities, is available on the
-FreePats project web pages:
-http://freepats.zenvoid.org/Guitar/acoustic-guitar.html
+    This program is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation, either version 3 of the License, or (at your option)
+    any later version.
 
+    This program is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+    for more details.
 
-Published under the terms of Creative Commons CC0 public domain dedication:
-https://creativecommons.org/publicdomain/zero/1.0/
+FreePats sound exception, as published with the original:
 
----
-Bundled in StrumLab: only the samples reachable from the chord library.
+    As a special exception, if you create a composition which uses these
+    sounds, and mix these sounds or unaltered portions of these sounds into
+    the composition, these sounds do not by themselves cause the entire
+    composition as a whole to be covered by the GNU General Public License.
+    This exception does not however invalidate any other reasons why the
+    composition might be covered by the GNU General Public License.
+
+    If you modify these sounds, you may extend this exception to your version
+    of the sounds, but you are not obligated to do so. If you do not wish to
+    do so, delete this exception statement from your version.
+
+NOTE ON SCOPE
+-------------
+That exception covers *music recorded using these sounds*. StrumLab
+redistributes the sample files themselves, which the exception does not cover,
+so these files are distributed under the GPL-3.0-or-later terms above. They sit
+in their own directory and are not linked into the application code; the other
+two instruments and the source code are unaffected. See the repository README.
+
 Regenerate: python3 scripts/build-samples.py acoustic <library-dir>
-CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/legalcode

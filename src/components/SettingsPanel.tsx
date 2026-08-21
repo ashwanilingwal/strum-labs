@@ -182,6 +182,7 @@ export function SettingsPanel({
                 value={state.audio.tone}
                 options={[
                   { id: "acoustic" as Tone, label: INSTRUMENTS.acoustic.label },
+                  { id: "classical" as Tone, label: INSTRUMENTS.classical.label },
                   { id: "electric" as Tone, label: INSTRUMENTS.electric.label },
                   { id: "synth" as Tone, label: "Synth" },
                 ]}

@@ -83,26 +83,47 @@ and stalls outright in a background tab.
 
 ## The guitar sound
 
-Two of the three tones are **real recordings**, both public domain:
+Three of the four tones are **real recordings**:
 
 | Tone | What it is | Source | Licence |
 | --- | --- | --- | --- |
-| Acoustic | Nylon-string classical guitar | FreePats Spanish classical, rec. roberto@zenvoid.org, 2008 | CC0 1.0 |
-| Electric | A Fender through a clean amp, bridge pickup | FreePats Electric Guitar FSBS (clean) | CC0 1.0 |
+| Acoustic | Steel-string dreadnought | FreePats FS Seagull, from samples by Gary Campion (FlameStudios), 2008 | **GPL-3.0-or-later** |
+| Classical | Nylon-string classical | FreePats Spanish classical, rec. roberto@zenvoid.org, 2008 | CC0 1.0 |
+| Electric | A Fender through a clean amp | FreePats Electric Guitar FSBS (clean) | CC0 1.0 |
 | Synth | Karplus-Strong plucked-string model | — | — |
 
-The synth is not just a leftover: it is what plays if a download fails, because
-a practice tool going silent over a failed fetch is worse than one sounding
+Measured in the browser, the same note gets brighter across the three exactly
+as it should: nylon 551, steel 1343, electric 2183 zero-crossings per second.
+They are distinct instruments, not one recording relabelled.
+
+The synth is not a leftover: it is what plays if a download fails, because a
+practice tool going silent over a failed fetch is worse than one sounding
 synthetic.
 
-**There is no steel-string tone, and that is the honest gap.** A steel-string
-dreadnought — bright and jangly — is what most strumming patterns are actually
-written for; the nylon classical is warmer and rounder, and better suited to the
-fingerpicking work later. FreePats has [a steel-string
-set](https://freepats.zenvoid.org/Guitar/steel-acoustic-guitar.html), but it is
-GPL-3, and its exception only covers *music you record using the samples*, not
-an application that redistributes the sample files. Bundling it would mean
-shipping GPL-3 files, so it was left out deliberately rather than overlooked.
+### A note on the GPL audio
+
+The steel-string samples are GPL-3.0-or-later. This was a deliberate choice —
+it is the sound strumming patterns are actually written for, and the two public
+domain sets are a nylon classical and an electric, neither of which is it.
+
+What that means in practice, and the reasoning, so nobody has to re-derive it:
+
+- FreePats publishes a **sound exception** alongside the GPL. Read it closely:
+  it covers *"a composition which uses these sounds"*. StrumLab does not mix
+  them into a composition — it redistributes the sample files. So the exception
+  does not apply to us, and those files travel under the plain GPL terms.
+- The files live alone in `public/samples/acoustic/`, are not linked into the
+  application, and are loaded at runtime over HTTP like any other asset. That is
+  the ordinary mere-aggregation case, so the source code is not affected.
+- `public/samples/acoustic/` carries `GPL.txt` (the full licence) and
+  `SOURCE.txt` (provenance, the exception text, and the modifications made).
+  Both must travel with the files if you redistribute them.
+- Modifications made here: reduced to the pitch centres the chord library can
+  reach, and re-encoded WAV to FLAC.
+- If you ever need StrumLab to be wholly permissive, delete that one directory
+  and its entry in `src/lib/audio/samples/index.ts`. Nothing else refers to it.
+
+This is a reading, not legal advice.
 
 ### How instruments are built
 
@@ -115,6 +136,11 @@ python3 scripts/build-samples.py <id> <extracted-library-dir>
 ```
 
 Nothing else in the app needs to know it exists.
+
+Non-FLAC libraries are transcoded on the way in. FLAC is lossless — verified
+byte-identical on a round-trip — and a decaying guitar note is mostly
+near-silence, so it compresses to roughly 15%. That is the difference between a
+4 MB steel-string and a 0.84 MB one.
 
 They are **FLAC**, deliberately. FLAC is lossless and carries no encoder delay
 at the head of the file, where MP3 and AAC both prepend padding. Measured in the

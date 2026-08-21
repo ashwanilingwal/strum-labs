@@ -34,7 +34,8 @@ Find your row, open that file, stop. None of these require reading the rest.
 | **When** things happen | `lib/audio/transport.ts` | Lookahead scheduler. Don't move timing into React. |
 | The **synth** itself | `lib/audio/engine.ts` | Karplus-Strong. `pluck`, `strum`, `click`. Also owns the audio graph and the duck node. |
 | **Sampled** guitar playback | `lib/audio/sampler.ts` | Real recordings. Voice stealing lives here. |
-| Add a sampled **instrument** | `scripts/build-samples.py`, then `lib/audio/samples/index.ts` | Two steps, nothing else. Per-instrument note maps are generated — do not hand-edit. |
+| Add a sampled **instrument** | `scripts/build-samples.py`, then `lib/audio/samples/index.ts` | Two steps, nothing else. Per-instrument note maps are generated — do not hand-edit. Non-FLAC sources are transcoded automatically. |
+| **Licensing** of the audio | `public/samples/<id>/SOURCE.txt` | Per-instrument, and it differs: the steel-string is GPL-3, the other two are CC0. Don't write one blanket statement. |
 | Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
 | The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
 | Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
