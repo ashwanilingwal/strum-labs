@@ -18,7 +18,7 @@ const LINKS = [
 export function Nav({ tone = "dark" }: { tone?: "dark" | "light" }) {
   const pathname = usePathname();
   return (
-    <nav className={`flex items-center gap-4 px-4 py-4 sm:px-8 ${tone === "light" ? "block-light" : ""}`}
+    <nav className={`wrap flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-4 sm:px-8 ${tone === "light" ? "block-light" : ""}`}
          style={{ background: "transparent" }}>
       <Link href="/" className="caps shrink-0 transition hover:text-accent" style={{ color: "var(--fg)" }}>
         StrumLab

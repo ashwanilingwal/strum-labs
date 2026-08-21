@@ -37,7 +37,13 @@ export function StrumLane({
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
       {Array.from({ length: pattern.bars }, (_, bar) => (
-        <div key={bar} className="min-w-0 flex-1">
+        <div
+          key={bar}
+          className="min-w-0 flex-1"
+          // Below this the arrows and counts become unreadable, so the lane
+          // scrolls instead of compressing. Four bars never fit a phone.
+          style={{ minWidth: pattern.slotsPerBar * 30 }}
+        >
           <div className="mb-1.5 flex items-baseline justify-between px-0.5">
             <span className="font-display text-[10px] uppercase tracking-[0.2em] text-fg-dim">
               bar {bar + 1}

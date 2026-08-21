@@ -35,8 +35,9 @@ but badly" — different mistakes, different fixes.
 
 ## The look
 
-Flat editorial: full-width blocks alternating black and lilac, inflated chrome
-lettering, flower confetti, tiny wide-tracked caps. There was a skeuomorphic
+Flat editorial: full-width blocks alternating black and brushed steel, liquid
+chrome lettering, sparkle and orb confetti, tiny wide-tracked caps. Y2K in its
+chrome-and-gunmetal register rather than its pastel one. There was a skeuomorphic
 hi-fi deck here — chrome bezels, glossy controls, a spinning record with a
 tonearm tracking the loop. It is gone. The tonearm and the lane's playhead were
 saying the same thing twice, and the gloss fought the type.
@@ -46,7 +47,23 @@ Two things worth knowing before changing any of it:
 - **Components never name a colour.** They use semantic tokens — `--fg`,
   `--accent`, `--tight`. Switching a block from dark to light is one class,
   `.block-light`, which re-points those tokens so every child follows without
-  knowing it moved. Re-skinning the app is an edit to `globals.css` alone.
+  knowing it moved. Re-skinning the app is an edit to `globals.css` alone — the
+  pastel-to-chrome change was exactly that plus one component.
+
+### Screen sizes
+
+Verified from 320px to 1920px. Three things do the work: `.wrap` caps content
+at 1440px so body copy never runs to unreadable line lengths on an ultrawide;
+the strum lane sets a minimum width per bar so it scrolls rather than
+compressing arrows into unreadable slivers; and the caps tracking tightens
+below 380px, where 0.28em of letter-spacing is width the screen cannot spare.
+- **Layout is an app shell, not a long page.** `main` is a fixed-height column:
+  nav, one scrolling region, transport pinned in flow at the bottom. The
+  earlier version used a sticky footer, which needs a spacer exactly matching
+  the bar's height — and measuring that means depending on `resize` events or a
+  `ResizeObserver`, both of which some embedded browser contexts never fire. In
+  a shell the bar simply cannot overlap the content at any size, and nothing
+  has to measure anything.
 - **The chrome lettering is two stacked copies** of the same text: a blurred
   solid behind for the bloom, a gradient-clipped face on top. It has to be two
   elements, because `background-clip: text` discards everything outside the

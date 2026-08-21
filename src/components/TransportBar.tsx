@@ -24,12 +24,20 @@ export function TransportBar({
   level: number;
 }) {
   const micOn = micStatus === "listening" || micStatus === "calibrating";
+  // Two labels, not one truncated: at 320px the full phrase pushes the bar to
+  // four rows, and a four-row transport hides the lane it sits under.
   const micLabel =
     micStatus === "listening" ? "Listening"
       : micStatus === "calibrating" ? "Measuring room"
       : micStatus === "opening" ? "Opening…"
       : micStatus === "error" ? "Mic failed"
       : "Listen to me play";
+  const micLabelShort =
+    micStatus === "listening" ? "Listening"
+      : micStatus === "calibrating" ? "Room…"
+      : micStatus === "opening" ? "Opening…"
+      : micStatus === "error" ? "Failed"
+      : "Listen";
 
   return (
     <div className="panel flex flex-wrap items-center gap-2 p-2 sm:gap-3 sm:p-3">
@@ -85,7 +93,8 @@ export function TransportBar({
             boxShadow: micOn ? "0 0 10px var(--tight)" : undefined,
           }}
         />
-        <span className="truncate text-xs sm:text-sm">{micLabel}</span>
+        <span className="truncate text-xs sm:hidden">{micLabelShort}</span>
+        <span className="hidden truncate text-xs sm:inline sm:text-sm">{micLabel}</span>
       </button>
 
       {micOn ? <LevelMeter db={level} /> : null}
@@ -93,8 +102,9 @@ export function TransportBar({
       {/* A gear glyph renders as an illegible speck at this size and does not
           match the editorial type elsewhere. The word is clearer and shorter
           to parse than an icon nobody has to decode. */}
-      <button type="button" onClick={onSettings} className="btn caps ml-auto !px-4" aria-label="Settings">
-        Settings
+      <button type="button" onClick={onSettings} className="btn caps !px-3 sm:ml-auto sm:!px-4" aria-label="Settings">
+        <span className="sm:hidden">Set</span>
+        <span className="hidden sm:inline">Settings</span>
       </button>
     </div>
   );

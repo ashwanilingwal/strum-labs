@@ -6,7 +6,7 @@ import { CHORDS, CHORD_TIERS, chordMidiNotes, type ChordTier } from "@/lib/music
 import { appStore } from "@/lib/storage/settings";
 import { ChordDiagram } from "./ChordDiagram";
 import { ChromeText } from "./ui/ChromeText";
-import { FlowerField } from "./ui/FlowerField";
+import { MotifField } from "./ui/MotifField";
 import { Nav } from "./ui/Nav";
 
 /**
@@ -40,15 +40,15 @@ export function ChordLibrary() {
       <Nav />
 
       <header className="relative px-4 pb-6 pt-4 sm:px-8">
-        <FlowerField density={0.5} />
-        <div className="relative z-10">
+        <MotifField density={0.5} />
+        <div className="wrap relative z-10">
           <ChromeText className="text-[clamp(3rem,11vw,7rem)]">Chords</ChromeText>
           <p className="caps mt-3 text-fg-dim">{CHORDS.length} shapes · tap any card to hear it</p>
         </div>
       </header>
 
       <div className="sticky top-0 z-10 border-y border-line bg-ink/95 px-4 py-3 backdrop-blur sm:px-8">
-        <div className="flex flex-wrap gap-2">
+        <div className="wrap flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setTier("all")}
@@ -70,7 +70,7 @@ export function ChordLibrary() {
       </div>
 
       <section className="block-light px-4 py-8 sm:px-8">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="wrap grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
           {shown.map((chord) => (
             <button
               key={chord.id}
@@ -78,7 +78,7 @@ export function ChordLibrary() {
               onClick={() => void strum(chord.id)}
               className="card-flat group flex gap-4 p-4 text-left transition"
               style={{
-                outline: sounding === chord.id ? "2px solid var(--lilac-500)" : "none",
+                outline: sounding === chord.id ? "2px solid var(--accent)" : "none",
                 outlineOffset: "2px",
               }}
               aria-label={`Hear ${chord.name}`}
@@ -87,7 +87,7 @@ export function ChordLibrary() {
                 <ChordDiagram chord={chord} size={104} />
               </div>
               <div className="min-w-0 flex-1">
-                <div className="font-display text-2xl leading-none text-lilac-700">{chord.symbol}</div>
+                <div className="font-display text-2xl leading-none text-chrome-700">{chord.symbol}</div>
                 <div className="caps mt-1 text-fg-dim">{chord.name}</div>
                 <p className="mt-2 text-xs leading-relaxed text-fg-muted">{chord.tip}</p>
               </div>

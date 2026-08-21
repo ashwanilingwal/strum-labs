@@ -8,7 +8,7 @@ import {
 import { appStore, type AppState } from "@/lib/storage/settings";
 import { touchLocal } from "@/hooks/useAccount";
 import { ChromeText } from "./ui/ChromeText";
-import { FlowerField } from "./ui/FlowerField";
+import { MotifField } from "./ui/MotifField";
 import { Nav } from "./ui/Nav";
 
 /**
@@ -52,8 +52,8 @@ export function PatternLibrary() {
       <Nav />
 
       <header className="relative flex flex-wrap items-end justify-between gap-4 px-4 pb-6 pt-4 sm:px-8">
-        <FlowerField density={0.5} />
-        <div className="relative z-10">
+        <MotifField density={0.5} />
+        <div className="wrap relative z-10">
           <ChromeText className="text-[clamp(3rem,11vw,7rem)]">Patterns</ChromeText>
           <p className="caps mt-3 text-fg-dim">{state.patterns.length} saved · tap one to practise it</p>
         </div>
@@ -63,18 +63,18 @@ export function PatternLibrary() {
       </header>
 
       <section className="block-light px-4 py-8 sm:px-8">
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="wrap grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
           {state.patterns.map((p) => (
             <article
               key={p.id}
               className="card-flat p-5"
               style={{
-                outline: p.id === state.activeId ? "2px solid var(--lilac-500)" : "none",
+                outline: p.id === state.activeId ? "2px solid var(--accent)" : "none",
                 outlineOffset: "2px",
               }}
             >
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="font-display text-2xl leading-none text-lilac-700">{p.name}</h2>
+                <h2 className="font-display text-2xl leading-none text-chrome-700">{p.name}</h2>
                 <span className="caps text-fg-dim">
                   {p.chords.join(" · ")} · {p.bpm} bpm
                 </span>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ChromeText } from "@/components/ui/ChromeText";
-import { FlowerField } from "@/components/ui/FlowerField";
+import { MotifField } from "@/components/ui/MotifField";
 import { Nav } from "@/components/ui/Nav";
 
 /**
@@ -23,7 +23,7 @@ export default function Page() {
       <Nav />
 
       <section className="relative flex flex-1 flex-col items-center justify-center px-4 py-16 text-center sm:px-8">
-        <FlowerField />
+        <MotifField />
         <div className="relative z-10 flex flex-col items-center">
         <ChromeText className="text-[clamp(3.5rem,16vw,13rem)]">StrumLab</ChromeText>
         <p className="caps mt-6 text-fg-dim">A strumming trainer that listens back</p>
@@ -37,7 +37,7 @@ export default function Page() {
         <div className="mx-auto grid max-w-5xl gap-8 sm:grid-cols-3">
           {BULLETS.map((b) => (
             <div key={b.k}>
-              <h2 className="font-display text-3xl leading-none text-lilac-700">{b.k}</h2>
+              <h2 className="font-display text-3xl leading-none text-chrome-700">{b.k}</h2>
               <p className="mt-3 text-sm leading-relaxed text-fg-muted">{b.v}</p>
             </div>
           ))}

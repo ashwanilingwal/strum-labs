@@ -46,7 +46,7 @@ Find your row, open that file, stop. None of these require reading the rest.
 | **Colours, type, every surface** | `:root` and `.block-light` in `globals.css` | Components name only semantic tokens (`--fg`, `--accent`, `--tight`). Re-skinning is this file alone. |
 | Dark vs light **ground** | add `.block-light` / `.block-dark` | Re-points the contextual tokens; children follow without knowing they moved. |
 | The **chrome lettering** | `.chrome-face` gradient in `globals.css`, `components/ui/ChromeText.tsx` | The hard mid-stops are what read as metal — a smooth ramp looks like plastic. |
-| **Flower confetti** | `components/ui/FlowerField.tsx` | Absolute, not fixed: blocks paint opaque, so a page-level layer behind them is invisible. Sections opt in with `relative` + `z-10` on their content. |
+| **Confetti motifs** | `components/ui/MotifField.tsx` | Absolute, not fixed: blocks paint opaque, so a page-level layer behind them is invisible. Sections opt in with `relative` + `z-10` on their content. |
 | The **nav** | `components/ui/Nav.tsx` | The only chrome any page carries. |
 | **Theme** colours | `:root` in `globals.css` | Every surface is a token or a utility class. |
 | The **live feedback** UI | `components/LiveFeedback.tsx` | Big verdict + timing scatter. |
@@ -76,8 +76,16 @@ Break these and things fail in ways that are hard to trace back.
    are what makes "38 ms late" a true statement.
 6. **`slotsPerBar` is a field, not a constant.** The editor offers eighths, but
    4/12/16 already work end to end. Don't hardcode 8.
-7. **Nothing is gated behind sign-in.** localStorage is the working copy;
+7. **The play screen is an app shell, not a long page.** Fixed-height column:
+   nav, one scrolling region, transport in flow at the bottom. Do not make the
+   transport sticky again — that needs a spacer matching its height, and
+   measuring it depends on `resize` / `ResizeObserver`, which some embedded
+   browser contexts never fire. The bug is silent: the spacer stays zero and
+   the lane becomes unreachable.
+8. **Nothing is gated behind sign-in.** localStorage is the working copy;
    an account only adds sync.
+9. **Check 320px before calling a layout done.** It is where the transport
+   wraps to three rows and where wide letter-spacing stops fitting.
 8. **One voice per string.** Samples ring for up to 5 seconds; without the
    voice stealing in `sampler.ts` and `engine.ts`, a bar of eighths stacks ~48
    simultaneous notes into mush. Re-striking a string must damp the last one.

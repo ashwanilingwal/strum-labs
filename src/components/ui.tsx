@@ -90,7 +90,7 @@ export function SegmentedControl<T extends string>({
               style={
                 on
                   ? {
-                      background: "var(--lilac-200)",
+                      background: "var(--chrome-200)",
                     }
                   : undefined
               }

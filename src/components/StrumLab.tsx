@@ -14,7 +14,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
 import { TransportBar } from "./TransportBar";
 import { ChromeText } from "./ui/ChromeText";
-import { FlowerField } from "./ui/FlowerField";
+import { MotifField } from "./ui/MotifField";
 import { Nav } from "./ui/Nav";
 
 /**
@@ -58,6 +58,15 @@ export function StrumLab() {
   const engine = useStrumEngine(pattern, state.audio, state.listen);
   const account = useAccount(state);
 
+  /**
+   * The transport is sticky, so once the page is taller than the viewport it
+   * floats over whatever is beneath it. Its flow position is the end of the
+   * document, so the content above needs exactly its height reserved or the
+   * last section is permanently unreachable.
+   *
+   * Measured rather than guessed: the bar wraps to one row on a desktop and
+   * three on a 320px phone, and a fixed spacer is wrong at every size but one.
+   */
   // Space is the universal transport key; ignore it while typing a name.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -97,17 +106,29 @@ export function StrumLab() {
   ].filter(Boolean) as { tone: string; text: string }[];
 
   return (
-    <main className="block-dark flex min-h-dvh flex-col">
-      <Nav />
+    /**
+     * App shell rather than a long page with a sticky footer. The transport
+     * lives in flow at the bottom of a fixed-height column and the content
+     * between scrolls, so the bar can never overlap the lane at any size and
+     * nothing has to measure anything. The sticky version needed a spacer
+     * matching the bar's height, which meant depending on resize events or a
+     * ResizeObserver — both of which some browser contexts simply never fire.
+     */
+    <main className="block-dark flex h-dvh flex-col overflow-hidden">
+      <div className="shrink-0">
+        <Nav />
+      </div>
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
 
       {/* Chord — the one big thing on the screen. */}
-      <section className="relative flex flex-1 flex-col justify-center gap-6 px-4 py-8 sm:px-8 lg:flex-row lg:items-center lg:gap-12">
-        <FlowerField density={0.5} />
+      <section className="relative flex flex-1 shrink-0 flex-col justify-center px-4 py-8 sm:px-8">
+        <MotifField density={0.5} />
+        <div className="wrap flex w-full flex-col gap-6 lg:flex-row lg:items-center lg:gap-12">
         <div className="relative z-10 min-w-0 flex-1">
           <p className="caps text-fg-dim">
             {engine.countIn > 0 ? "Count in" : engine.playing ? `Bar ${bar + 1} of ${pattern.bars}` : "Ready"}
           </p>
-          <ChromeText className="mt-2 text-[clamp(5rem,20vw,15rem)]">
+          <ChromeText className="mt-2 text-[clamp(5rem,19vw,18rem)]">
             {engine.countIn > 0 ? String(engine.countIn) : (chord?.symbol ?? "—")}
           </ChromeText>
           <div className="mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-1">
@@ -128,10 +149,12 @@ export function StrumLab() {
             <ChordDiagram chord={chord} size={168} />
           </div>
         ) : null}
+        </div>
       </section>
 
       {/* The pattern. Light ground so it reads as a separate object. */}
       <section className="block-light px-4 py-6 sm:px-8">
+        <div className="wrap">
         <div className="mb-3 flex items-baseline justify-between gap-4">
           <span className="caps text-fg-dim">{pattern.name}</span>
           <span className="caps text-fg-dim">
@@ -144,6 +167,7 @@ export function StrumLab() {
           verdicts={engine.verdicts}
           showVerdicts={showVerdicts}
         />
+        </div>
       </section>
 
       {showVerdicts ? (
@@ -178,12 +202,10 @@ export function StrumLab() {
         </div>
       ) : null}
 
-      {/* The transport is sticky, so it overlays whatever sits beneath it once
-          the page is taller than the viewport. This reserves that space so the
-          lane is never hidden behind it on a phone. */}
-      <div aria-hidden="true" className="h-24 shrink-0 sm:h-0" />
+      </div>
 
-      <div className="sticky bottom-0 border-t border-line bg-ink/95 px-4 py-3 backdrop-blur sm:px-8">
+      <div className="shrink-0 border-t border-line bg-ink/95 px-4 py-3 sm:px-8">
+        <div className="wrap">
         <TransportBar
           playing={engine.playing}
           onToggle={engine.toggle}
@@ -198,6 +220,7 @@ export function StrumLab() {
           onSettings={() => setSettingsOpen(true)}
           level={engine.level}
         />
+        </div>
       </div>
 
       <SettingsPanel

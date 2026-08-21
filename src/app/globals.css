@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   StrumLab — flat editorial. Black and lilac blocks, inflated chrome type,
-   flower confetti, tiny wide-tracked caps.
+   StrumLab — flat editorial. Black and steel blocks, liquid-chrome type,
+   sparkle and orb confetti, tiny wide-tracked caps.
 
    The whole look lives here. Components reference semantic token names only
    (--fg, --accent, --tight) and never literal colours, so re-skinning the app
@@ -10,36 +10,41 @@
    ========================================================================== */
 
 :root {
-  --ink: #0b0a0c;
-  --ink-soft: #151217;
-  --ink-lift: #1e1a22;
+  --ink: #07080a;
+  --ink-soft: #101319;
+  --ink-lift: #191d25;
 
-  --lilac-50:  #f8f1fc;
-  --lilac-100: #ecdcf4;
-  --lilac-200: #dcc6ea;
-  --lilac-300: #c9a8e0;
-  --lilac-400: #b084ce;
-  --lilac-500: #8e5fb0;
-  --lilac-700: #543370;
-  --blush: #f4dde9;
+  /* Liquid chrome and gunmetal. Y2K's other register — the one of brushed
+     steel, ice-blue displays and acid highlights rather than pastels. */
+  --chrome-50:  #f5f8fb;
+  --chrome-100: #e4eaf1;
+  --chrome-200: #ccd6e1;
+  --chrome-300: #a9b8c8;
+  --chrome-400: #7c8c9e;
+  --chrome-500: #526172;
+  --chrome-700: #28323e;
+
+  --ice: #5fd2f2;
+  --ice-deep: #1f6d8c;
+  --acid: #b8f24a;
 
   /* Verdict semantics. Pastel so they belong to the palette, but far enough
      apart in hue to stay readable as good / nearly / wrong. */
-  --tight: #7fe7b5;
-  --close: #ffc68a;
-  --loose: #ff8fa8;
-  --extra: #f0a8d8;
+  --tight: #5fe3a0;
+  --close: #ffc94d;
+  --loose: #ff6b7a;
+  --extra: var(--ice);
 
-  --accent: var(--lilac-300);
-  --accent-deep: var(--lilac-500);
+  --accent: var(--ice);
+  --accent-deep: var(--ice-deep);
 
   /* Contextual: overridden wholesale by .block-light. */
-  --fg: #f4f0f2;
-  --fg-muted: #b6a7c2;
-  --fg-dim: #7d6f8a;
+  --fg: #eef3f8;
+  --fg-muted: #a3b1c0;
+  --fg-dim: #6c7b8b;
   --surface: var(--ink-soft);
   --surface-lift: var(--ink-lift);
-  --line: rgba(236, 220, 244, 0.16);
+  --line: rgba(204, 214, 225, 0.18);
 
   --radius: 18px;
   --radius-sm: 10px;
@@ -55,12 +60,15 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-deep: var(--accent-deep);
-  --color-lilac: var(--lilac-300);
-  --color-lilac-100: var(--lilac-100);
-  --color-lilac-200: var(--lilac-200);
-  --color-lilac-400: var(--lilac-400);
-  --color-lilac-700: var(--lilac-700);
-  --color-blush: var(--blush);
+  --color-chrome-50: var(--chrome-50);
+  --color-chrome-100: var(--chrome-100);
+  --color-chrome-200: var(--chrome-200);
+  --color-chrome-300: var(--chrome-300);
+  --color-chrome-400: var(--chrome-400);
+  --color-chrome-500: var(--chrome-500);
+  --color-chrome-700: var(--chrome-700);
+  --color-ice: var(--ice);
+  --color-acid: var(--acid);
   --color-tight: var(--tight);
   --color-close: var(--close);
   --color-loose: var(--loose);
@@ -80,7 +88,7 @@ body {
   overscroll-behavior-y: none;
 }
 
-::selection { background: var(--lilac-300); color: var(--ink); }
+::selection { background: var(--chrome-300); color: var(--ink); }
 
 /* --- blocks --------------------------------------------------------------
    A page is a stack of full-width blocks that alternate ground. Switching a
@@ -88,29 +96,29 @@ body {
    and every child follows without knowing it moved. */
 
 .block-light {
-  --fg: #191320;
-  --fg-muted: #56455f;
-  --fg-dim: #7b6885;
-  --surface: rgba(255, 255, 255, 0.55);
+  --fg: #131820;
+  --fg-muted: #445162;
+  --fg-dim: #6b7887;
+  --surface: rgba(255, 255, 255, 0.6);
   --surface-lift: #ffffff;
-  --line: rgba(25, 19, 32, 0.14);
-  --accent: var(--lilac-500);
-  --accent-deep: var(--lilac-700);
-  --flower-alpha: 0.3;
-  background: linear-gradient(168deg, var(--lilac-100), var(--blush) 58%, var(--lilac-200));
+  --line: rgba(19, 24, 32, 0.14);
+  --accent: var(--ice-deep);
+  --accent-deep: var(--chrome-700);
+  --motif-alpha: 0.26;
+  background: linear-gradient(168deg, var(--chrome-50), var(--chrome-100) 55%, var(--chrome-200));
   color: var(--fg);
 }
 
 .block-dark {
-  --fg: #f4f0f2;
-  --fg-muted: #b6a7c2;
-  --fg-dim: #7d6f8a;
+  --fg: #eef3f8;
+  --fg-muted: #a3b1c0;
+  --fg-dim: #6c7b8b;
   --surface: var(--ink-soft);
   --surface-lift: var(--ink-lift);
   --line: rgba(236, 220, 244, 0.16);
-  --accent: var(--lilac-300);
-  --accent-deep: var(--lilac-500);
-  --flower-alpha: 0.55;
+  --accent: var(--chrome-300);
+  --accent-deep: var(--chrome-500);
+  --motif-alpha: 0.55;
   background: var(--ink);
   color: var(--fg);
 }
@@ -133,7 +141,7 @@ body {
 .chrome-glow {
   position: absolute;
   inset: 0;
-  color: var(--lilac-400);
+  color: var(--chrome-400);
   filter: blur(14px);
   opacity: 0.65;
   transform: scale(1.04);
@@ -147,19 +155,19 @@ body {
   background-image: linear-gradient(
     178deg,
     #ffffff 0%,
-    #fbf4ff 6%,
-    #e6cef8 17%,
-    #c49ae6 29%,
-    #8b5fbe 40%,
-    #4a2c6e 47%,
-    #6f43a0 50%,
-    #b184db 53%,
-    #eed6fb 60%,
+    #f3f7fb 6%,
+    #d2dde8 17%,
+    #a1b2c4 29%,
+    #63758a 40%,
+    #28323e 47%,
+    #46586b 50%,
+    #8b9fb4 53%,
+    #dbe5ef 60%,
     #ffffff 68%,
-    #d9b8ee 78%,
-    #a075c8 88%,
-    #6f4c9c 95%,
-    #cfaee8 100%
+    #bacadb 78%,
+    #7a8da2 88%,
+    #465a6d 95%,
+    #a9bacc 100%
   );
   -webkit-background-clip: text;
   background-clip: text;
@@ -173,7 +181,7 @@ body {
 .block-light .chrome-face {
   filter:
     drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8))
-    drop-shadow(0 10px 20px rgba(84, 51, 112, 0.32));
+    drop-shadow(0 10px 20px rgba(40, 50, 62, 0.32));
 }
 
 /* --- type ----------------------------------------------------------------- */
@@ -197,6 +205,20 @@ body {
 .num { font-family: var(--font-mono-num), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 
 .rule { height: 1px; background: var(--line); }
+
+/* Content stops widening past this; the block's ground still runs full bleed.
+   Without it, body copy on an ultrawide runs to unreadable line lengths. */
+.wrap {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+}
+
+/* Tracking this wide costs real width; a 320px phone cannot afford it. */
+@media (max-width: 380px) {
+  .caps { letter-spacing: 0.16em; font-size: 9px; }
+  .caps-lg { letter-spacing: 0.12em; font-size: 12px; }
+}
 
 /* --- surfaces ------------------------------------------------------------- */
 
@@ -243,11 +265,11 @@ body {
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .btn-lit {
-  background: var(--lilac-200);
-  border-color: var(--lilac-200);
+  background: var(--chrome-200);
+  border-color: var(--chrome-200);
   color: #191320;
 }
-.btn-lit:hover:not(:disabled) { background: var(--lilac-100); border-color: var(--lilac-100); color: #191320; }
+.btn-lit:hover:not(:disabled) { background: var(--chrome-100); border-color: var(--chrome-100); color: #191320; }
 
 .btn-hot {
   background: var(--loose);
@@ -278,9 +300,9 @@ body {
   transition: transform 110ms ease, background 160ms ease, border-color 160ms ease;
 }
 
-.slot-down { background: var(--lilac-300); border-color: var(--lilac-300); color: #191320; }
-.slot-up { background: var(--lilac-100); border-color: var(--lilac-100); color: #191320; }
-.slot-mute { background: var(--blush); border-color: var(--blush); color: #2b0d15; }
+.slot-down { background: var(--chrome-300); border-color: var(--chrome-300); color: #191320; }
+.slot-up { background: var(--chrome-100); border-color: var(--chrome-100); color: #191320; }
+.slot-mute { background: var(--chrome-200); border-color: var(--chrome-200); color: #2b0d15; }
 .slot-skip { background: transparent; border-style: dashed; border-color: var(--line); }
 
 .slot-active { transform: translateY(-4px); border-color: var(--fg); box-shadow: 0 0 0 2px var(--fg); }
@@ -388,13 +410,13 @@ body {
 .timing-mean { position: absolute; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; background: var(--accent); transition: left 200ms ease-out; }
 .timing-needle { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; border-radius: 2px; transition: left 140ms ease-out; }
 
-/* --- flower confetti ------------------------------------------------------ */
+/* --- confetti motifs ------------------------------------------------------ */
 
 /* Absolute, not fixed: blocks paint an opaque ground, so a page-level layer
-   behind them is invisible. Flowers belong to the section they decorate —
+   behind them is invisible. Motifs belong to the section they decorate —
    which is also how the reference uses them. Sections opt in with `relative`
    and lift their own content above with `z-10`. */
-.flower-field {
+.motif-field {
   position: absolute;
   inset: 0;
   z-index: 0;
@@ -404,16 +426,16 @@ body {
 
 /* Lilac at low alpha over near-black reads as grey, so the two grounds get
    different weights rather than one compromise value. */
-.flower {
+.motif {
   position: absolute;
   transform: translate(-50%, -50%);
   animation: bob 9s ease-in-out infinite;
-  opacity: var(--flower-alpha, 0.4);
+  opacity: var(--motif-alpha, 0.4);
 }
 
 /* On a phone the same blooms cover the body copy rather than decorating it. */
 @media (max-width: 640px) {
-  .flower { scale: 0.55; opacity: calc(var(--flower-alpha, 0.4) * 0.7); }
+  .motif { scale: 0.55; opacity: calc(var(--motif-alpha, 0.4) * 0.7); }
 }
 
 @keyframes bob {
@@ -465,6 +487,6 @@ input[type="range"]::-moz-range-track { height: 4px; border-radius: 999px; backg
 input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: var(--accent); }
 
 @media (prefers-reduced-motion: reduce) {
-  .flower, .verdict-orb-flash, .verdict-badge, .verdict-flag { animation: none; }
+  .motif, .verdict-orb-flash, .verdict-badge, .verdict-flag { animation: none; }
   * { transition-duration: 1ms !important; }
 }
