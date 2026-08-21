@@ -1,23 +1,26 @@
 #!/usr/bin/env python3
 """
-Regenerate src/lib/audio/samples.ts and public/samples/guitar/ from the
-FreePats Spanish classical guitar library.
+Build one sampled instrument for StrumLab from an SFZ library.
 
-Source (CC0 1.0, public domain):
-  https://freepats.zenvoid.org/Guitar/acoustic-guitar.html
-  SpanishClassicalGuitar-SFZ+FLAC-20190618.7z
+    python3 scripts/build-samples.py <instrument-id> <path-to-extracted-library>
 
-Run when the chord library gains notes outside the current range:
-  python3 scripts/build-samples.py /path/to/SpanishClassicalGuitar-SFZ+FLAC-20190618
+e.g.
+    python3 scripts/build-samples.py acoustic ~/dl/SpanishClassicalGuitar-SFZ+FLAC-20190618
+    python3 scripts/build-samples.py electric ~/dl/EGuitarFSBS-clean-bridge-small-SFZ+FLAC-20260807
 
-Only samples reachable from the chord library are copied, which is what keeps
-this at ~2 MB instead of the full 5 MB set.
+Writes:
+    public/samples/<id>/<pitch-centre>.flac   only the notes chords can reach
+    src/lib/audio/samples/<id>.ts             the generated note -> centre map
+
+Adding an instrument is this command plus one line in src/lib/audio/samples/index.ts.
+Nothing else in the app needs to know it exists.
+
+Only samples the chord library can actually produce are copied, which is what
+keeps each instrument around 2 MB instead of the full set.
 """
 import os, re, shutil, sys
 
 TUNING = [40, 45, 50, 55, 59, 64]  # standard tuning, low E first
-OUT_DIR = "public/samples/guitar"
-OUT_TS = "src/lib/audio/samples.ts"
 
 
 def chord_notes(path="src/lib/music/chords.ts"):
@@ -31,10 +34,10 @@ def chord_notes(path="src/lib/music/chords.ts"):
 
 
 def parse_sfz(path):
-    text = open(path).read()
+    """Regions as (lokey, hikey, pitch_keycenter, relative sample path)."""
     regions = []
-    for block in text.split("<region>")[1:]:
-        d = dict(re.findall(r"(\w+)=([^\s]+)", block))
+    for block in open(path).read().split("<region>")[1:]:
+        d = dict(re.findall(r"(\w+)=(\S+)", block))
         if "key" in d:
             lo = hi = kc = int(d["key"])
         else:
@@ -43,10 +46,34 @@ def parse_sfz(path):
     return regions
 
 
-def main(base):
-    sfz = next(f for f in os.listdir(base) if f.endswith(".sfz"))
-    regions = parse_sfz(os.path.join(base, sfz))
-    os.makedirs(OUT_DIR, exist_ok=True)
+TEMPLATE = '''/**
+ * GENERATED FILE - do not edit by hand.
+ * Rebuild: python3 scripts/build-samples.py {id} <library-dir>
+ *
+ * {name}
+ * {credit}
+ * Licence: {licence}
+ *
+ * Maps every MIDI note the chord library can produce to the pitch centre of
+ * the recording covering it. Where the two differ the sampler resamples by
+ * that interval.
+ */
+
+export const {const}: Record<number, number> = {{
+{body}
+}};
+'''
+
+
+def main(inst, base):
+    sfz_name = next(f for f in os.listdir(base) if f.endswith(".sfz"))
+    regions = parse_sfz(os.path.join(base, sfz_name))
+
+    out_dir = f"public/samples/{inst}"
+    os.makedirs(out_dir, exist_ok=True)
+    for stale in os.listdir(out_dir):
+        if stale.endswith(".flac"):
+            os.remove(os.path.join(out_dir, stale))
 
     mapping, copied = {}, set()
     for note in sorted(chord_notes()):
@@ -57,58 +84,32 @@ def main(base):
         _, _, centre, sample = match[0]
         dest = f"{centre}.flac"
         if dest not in copied:
-            shutil.copy(os.path.join(base, sample), os.path.join(OUT_DIR, dest))
+            shutil.copy(os.path.join(base, sample), os.path.join(out_dir, dest))
             copied.add(dest)
         mapping[note] = centre
 
+    # Provenance is read out of the library's own readme so it cannot drift.
+    readme = next(
+        (f for f in os.listdir(base) if f.lower() in ("readme.txt", "read_me.txt")), None
+    )
+    text = open(os.path.join(base, readme)).read() if readme else ""
+    name = text.strip().splitlines()[0] if text else inst
+    licence = "CC0 1.0 public domain" if "CC0" in text else "see library README"
+    credit = next((l.strip() for l in text.splitlines() if "recorded" in l.lower() or "sampling" in l.lower()), "")
+
     body = "\n".join(f"  {n}: {c}," for n, c in sorted(mapping.items()))
-    open(OUT_TS, "w").write(HEADER + body + "\n" + FOOTER)
-    size = sum(os.path.getsize(os.path.join(OUT_DIR, f)) for f in copied)
-    print(f"{len(copied)} files, {size / 1024 / 1024:.2f} MB, {len(mapping)} notes mapped")
+    os.makedirs("src/lib/audio/samples", exist_ok=True)
+    open(f"src/lib/audio/samples/{inst}.ts", "w").write(
+        TEMPLATE.format(
+            id=inst, name=name, credit=credit[:100], licence=licence,
+            const=f"{inst.upper()}_NOTES", body=body,
+        )
+    )
+    size = sum(os.path.getsize(os.path.join(out_dir, f)) for f in copied)
+    print(f"{inst}: {len(copied)} files, {size/1024/1024:.2f} MB, {len(mapping)} notes")
 
-
-HEADER = '''/**
- * Sampled guitar: which recording covers which note.
- *
- * Source: FreePats "Spanish classical guitar", recorded by roberto@zenvoid.org
- * in 2008 with an AKG Perception 120, released under Creative Commons CC0 1.0
- * (public domain - no attribution required, commercial use permitted).
- * https://freepats.zenvoid.org/Guitar/acoustic-guitar.html
- *
- * Generated from that library's own .sfz key map, intersected with every note
- * the chord library can actually produce, so nothing unreachable ships. Each
- * entry maps a MIDI note to the pitch centre of the recording covering it;
- * where the two differ the sampler resamples by that interval (never more
- * than a semitone here).
- *
- * Files are FLAC and named by pitch centre. That is deliberate: FLAC is
- * lossless and, unlike MP3 or AAC, carries no encoder delay at the head of the
- * file. In a timing trainer, a few milliseconds of silent padding before every
- * attack is not an acceptable cost.
- *
- * Regenerate with scripts/build-samples.py if the chord library gains notes
- * outside the current range.
- */
-
-/** MIDI note -> pitch centre of the sample covering it. */
-export const SAMPLE_FOR_NOTE: Record<number, number> = {
-'''
-
-FOOTER = '''};
-
-export const SAMPLE_BASE_URL = "/samples/guitar";
-
-export function sampleUrl(centreMidi: number): string {
-  return `${SAMPLE_BASE_URL}/${centreMidi}.flac`;
-}
-
-/** Every distinct file, for preloading. */
-export const SAMPLE_CENTRES: number[] = Array.from(
-  new Set(Object.values(SAMPLE_FOR_NOTE)),
-).sort((a, b) => a - b);
-'''
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
+    if len(sys.argv) != 3:
         sys.exit(__doc__)
-    main(sys.argv[1])
+    main(sys.argv[1], sys.argv[2])

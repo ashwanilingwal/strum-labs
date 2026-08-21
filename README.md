@@ -43,26 +43,49 @@ and stalls outright in a background tab.
 
 ## The guitar sound
 
-The acoustic tone is **real recordings**, not synthesis: a Spanish classical
-guitar from the [FreePats](https://freepats.zenvoid.org/Guitar/acoustic-guitar.html)
-library, recorded by roberto@zenvoid.org in 2008 with an AKG Perception 120 and
-released under **CC0 1.0** — public domain, no attribution required, commercial
-use permitted. The electric tone stays synthesised, where a synthetic edge is
-honest rather than a compromise.
+Two of the three tones are **real recordings**, both public domain:
 
-Only the 22 samples the chord library can actually reach are shipped (~2 MB of
-the original 5 MB set); `scripts/build-samples.py` regenerates that subset and
-`lib/audio/samples.ts` from the library's own `.sfz` key map.
+| Tone | What it is | Source | Licence |
+| --- | --- | --- | --- |
+| Acoustic | Nylon-string classical guitar | FreePats Spanish classical, rec. roberto@zenvoid.org, 2008 | CC0 1.0 |
+| Electric | A Fender through a clean amp, bridge pickup | FreePats Electric Guitar FSBS (clean) | CC0 1.0 |
+| Synth | Karplus-Strong plucked-string model | — | — |
+
+The synth is not just a leftover: it is what plays if a download fails, because
+a practice tool going silent over a failed fetch is worse than one sounding
+synthetic.
+
+**There is no steel-string tone, and that is the honest gap.** A steel-string
+dreadnought — bright and jangly — is what most strumming patterns are actually
+written for; the nylon classical is warmer and rounder, and better suited to the
+fingerpicking work later. FreePats has [a steel-string
+set](https://freepats.zenvoid.org/Guitar/steel-acoustic-guitar.html), but it is
+GPL-3, and its exception only covers *music you record using the samples*, not
+an application that redistributes the sample files. Bundling it would mean
+shipping GPL-3 files, so it was left out deliberately rather than overlooked.
+
+### How instruments are built
+
+Only the samples the chord library can actually reach are shipped — about 2 MB
+per instrument instead of the full sets. Adding one is two steps:
+
+```bash
+python3 scripts/build-samples.py <id> <extracted-library-dir>
+# then add one entry to src/lib/audio/samples/index.ts
+```
+
+Nothing else in the app needs to know it exists.
 
 They are **FLAC**, deliberately. FLAC is lossless and carries no encoder delay
 at the head of the file, where MP3 and AAC both prepend padding. Measured in the
-browser, these decode with 0–0.1 ms of leading silence, so an attack lands
-exactly where it was scheduled. In a timing trainer that is not a detail.
+browser, these decode with 0.1–0.3 ms of leading silence, so an attack lands
+exactly where the transport scheduled it. In a timing trainer that is not a
+detail.
 
-Notes ring for up to five seconds, so each string gets **one voice**: re-striking
-a string damps whatever it was playing, as a real one does. Without that, a bar
-of eighths stacks around 48 overlapping notes. Measured on the real engine, the
-cap holds peak polyphony at 12.
+Notes ring for five to nine seconds, so each string gets **one voice**:
+re-striking a string damps whatever it was playing, as a real one does. Without
+that, a bar of eighths stacks around 48 overlapping notes. Measured on the real
+engine, the cap holds peak polyphony at 12.
 
 ## Hearing itself
 

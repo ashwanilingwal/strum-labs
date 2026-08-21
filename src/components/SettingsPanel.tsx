@@ -6,6 +6,8 @@ import type { AppState } from "@/lib/storage/settings";
 import type { MicStatus } from "@/hooks/useStrumEngine";
 import type { SamplerState } from "@/lib/audio/sampler";
 import type { DuckMode } from "@/lib/storage/settings";
+import type { Tone } from "@/lib/audio/engine";
+import { INSTRUMENTS, isInstrument } from "@/lib/audio/samples";
 import type { RoomProfile } from "@/lib/listen/detector";
 import type { SyncStatus } from "@/hooks/useAccount";
 import { PatternEditor } from "./PatternEditor";
@@ -179,32 +181,37 @@ export function SettingsPanel({
                 label="Tone"
                 value={state.audio.tone}
                 options={[
-                  { id: "acoustic", label: "Acoustic" },
-                  { id: "electric", label: "Electric" },
+                  { id: "acoustic" as Tone, label: INSTRUMENTS.acoustic.label },
+                  { id: "electric" as Tone, label: INSTRUMENTS.electric.label },
+                  { id: "synth" as Tone, label: "Synth" },
                 ]}
                 onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, tone: v } }))}
               />
-              <p className="px-3 pb-2 text-[11px] leading-relaxed text-fg-dim">
-                {state.audio.tone === "acoustic" ? (
+              <div className="px-3 pb-2 text-[11px] leading-relaxed text-fg-dim">
+                {isInstrument(state.audio.tone) ? (
                   <>
-                    Real recordings of a Spanish classical guitar, from the FreePats
-                    library (public domain).{" "}
-                    {sampleState === "loading" ? (
-                      <span className="text-amber">Downloading them now — about 2 MB, once.</span>
-                    ) : sampleState === "error" ? (
-                      <span className="text-rose">
-                        They failed to load, so you are hearing the synthesised fallback.
-                      </span>
-                    ) : sampleState === "ready" ? (
-                      <span className="text-lime">Loaded.</span>
-                    ) : (
-                      "They download the first time you press play."
-                    )}
+                    <p>{INSTRUMENTS[state.audio.tone].blurb}</p>
+                    <p className="mt-1 opacity-80">
+                      {INSTRUMENTS[state.audio.tone].credit} · {INSTRUMENTS[state.audio.tone].licence}
+                    </p>
+                    <p className="mt-1">
+                      {sampleState === "loading" ? (
+                        <span className="text-amber">Downloading the recordings — about 2 MB, once.</span>
+                      ) : sampleState === "error" ? (
+                        <span className="text-rose">
+                          They failed to load, so you are hearing the synth instead.
+                        </span>
+                      ) : sampleState === "ready" ? (
+                        <span className="text-lime">Loaded.</span>
+                      ) : (
+                        "Downloads the first time you press play."
+                      )}
+                    </p>
                   </>
                 ) : (
-                  "Synthesised with a plucked-string model. No download."
+                  <p>Plucked-string model, synthesised in the browser. No download, and it is what plays if a recording fails to load.</p>
                 )}
-              </p>
+              </div>
               <SegmentedControl
                 label="Count-in"
                 value={String(state.audio.countInBars)}

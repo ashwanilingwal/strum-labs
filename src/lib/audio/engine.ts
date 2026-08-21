@@ -13,14 +13,16 @@
  */
 
 import { GuitarSampler, type SamplerState } from "./sampler";
+import { isInstrument, type InstrumentId } from "./samples";
 import { midiToFreq } from "../music/theory";
 
 /**
- * "acoustic" plays real CC0 recordings of a Spanish classical guitar;
- * "electric" is the Karplus-Strong model. Where samples are still loading or
- * failed to load, acoustic falls back to the model rather than going silent.
+ * "acoustic" and "electric" are real CC0 recordings (see samples/index.ts);
+ * "synth" is the Karplus-Strong model. A sampled tone falls back to the model
+ * while its recordings are still downloading, or if they failed — going silent
+ * because a fetch failed would be worse than sounding synthetic.
  */
-export type Tone = "acoustic" | "electric";
+export type Tone = InstrumentId | "synth";
 
 const BUFFER_SECONDS = 2.6;
 
@@ -50,6 +52,7 @@ export class AudioEngine {
   private live = new Set<AudioBufferSourceNode>();
   private voices = new Map<number, { src: AudioBufferSourceNode; gain: GainNode }>();
   private _tone: Tone = "acoustic";
+
   private _volume = 0.75;
   private _clickVolume = 0.5;
 
@@ -123,18 +126,21 @@ export class AudioEngine {
     this.sampler = new GuitarSampler(ctx, this.sampleBus);
   }
 
-  /** Kick off the ~2 MB sample download. Idempotent. */
+  /** Kick off the ~2 MB download for the current tone. Idempotent. */
   loadSamples(): Promise<void> {
-    return this.sampler ? this.sampler.load() : Promise.resolve();
+    if (!this.sampler || !isInstrument(this._tone)) return Promise.resolve();
+    return this.sampler.load(this._tone);
   }
 
+  /** Load state of the current tone. "idle" for the synth, which needs none. */
   get sampleState(): SamplerState {
-    return this.sampler?.state ?? "idle";
+    if (!this.sampler || !isInstrument(this._tone)) return "idle";
+    return this.sampler.state(this._tone);
   }
 
   /** True when the next note will be a real recording rather than the model. */
   get usingSamples(): boolean {
-    return this._tone === "acoustic" && (this.sampler?.ready ?? false);
+    return isInstrument(this._tone) && (this.sampler?.ready(this._tone) ?? false);
   }
 
   setVolume(v: number) {
@@ -219,7 +225,7 @@ export class AudioEngine {
     if (!this.ctx || !this.bus) return;
 
     // Real recording first; the model is the fallback, not the default.
-    if (this.usingSamples && this.sampler!.play(midi, opts)) return;
+    if (this.usingSamples && this.sampler!.play(this._tone as InstrumentId, midi, opts)) return;
 
     const ctx = this.ctx;
     const at = Math.max(opts.at ?? ctx.currentTime, ctx.currentTime);

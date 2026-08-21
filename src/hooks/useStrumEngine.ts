@@ -129,7 +129,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
    * is driven by the engine being live rather than by mount.
    */
   const fetchSamples = useCallback(async () => {
-    if (audioRef.current.tone !== "acoustic") return;
+    if (audioRef.current.tone === "synth") return;
     if (engine.sampleState === "ready" || engine.sampleState === "loading") return;
     setSampleState("loading");
     await engine.loadSamples();
@@ -140,7 +140,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     // Only possible once the AudioContext exists, which needs a user gesture —
     // so this covers switching tone mid-session; the first load is kicked off
     // by start()/startListening() instead.
-    if (audio.tone !== "acoustic" || !engine.ready) return;
+    if (audio.tone === "synth" || !engine.ready) return;
     let alive = true;
     void (async () => {
       // Yield first: updating state synchronously in an effect body cascades

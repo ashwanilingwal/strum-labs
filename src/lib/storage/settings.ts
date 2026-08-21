@@ -7,6 +7,8 @@
  * carries your existing patterns up rather than starting you empty.
  */
 
+import type { Tone } from "../audio/engine";
+import { isInstrument } from "../audio/samples";
 import { normalise, PRESETS, type Pattern } from "../music/pattern";
 import { createLocalStore, type ExternalStore } from "./store";
 
@@ -17,7 +19,7 @@ export interface AudioSettings {
   click: boolean;
   volume: number;
   clickVolume: number;
-  tone: "acoustic" | "electric";
+  tone: Tone;
   /** Bars of metronome before the pattern starts. 0 = straight in. */
   countInBars: number;
 }
@@ -95,10 +97,15 @@ export function reviveState(raw: unknown): AppState {
 
   const activeId = patterns.some((p) => p.id === r.activeId) ? r.activeId! : patterns[0].id;
 
+  // A tone stored by an older version (or a device that has since had an
+  // instrument removed) must not reach the engine unrecognised.
+  const audio = { ...base.audio, ...(r.audio ?? {}) };
+  if (audio.tone !== "synth" && !isInstrument(audio.tone)) audio.tone = base.audio.tone;
+
   return {
     patterns,
     activeId,
-    audio: { ...base.audio, ...(r.audio ?? {}) },
+    audio,
     listen: { ...base.listen, ...(r.listen ?? {}) },
     roomNoiseDb: typeof r.roomNoiseDb === "number" ? r.roomNoiseDb : null,
   };

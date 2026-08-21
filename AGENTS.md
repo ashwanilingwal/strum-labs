@@ -22,7 +22,7 @@ Find your row, open that file, stop. None of these require reading the rest.
 | **When** things happen | `lib/audio/transport.ts` | Lookahead scheduler. Don't move timing into React. |
 | The **synth** itself | `lib/audio/engine.ts` | Karplus-Strong. `pluck`, `strum`, `click`. Also owns the audio graph and the duck node. |
 | **Sampled** guitar playback | `lib/audio/sampler.ts` | Real recordings. Voice stealing lives here. |
-| Which **sample** covers which note | `lib/audio/samples.ts` | Generated — do not hand-edit. Run `scripts/build-samples.py`. |
+| Add a sampled **instrument** | `scripts/build-samples.py`, then `lib/audio/samples/index.ts` | Two steps, nothing else. Per-instrument note maps are generated — do not hand-edit. |
 | Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
 | The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
 | Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
@@ -65,6 +65,8 @@ Break these and things fail in ways that are hard to trace back.
 8. **One voice per string.** Samples ring for up to 5 seconds; without the
    voice stealing in `sampler.ts` and `engine.ts`, a bar of eighths stacks ~48
    simultaneous notes into mush. Re-striking a string must damp the last one.
-9. **The click never gets ducked with the guitar.** It sits outside
+9. **Sampled tones fall back to the synth, never to silence.** A failed
+   download must not leave a practice tool with no sound.
+10. **The click never gets ducked with the guitar.** It sits outside
    `guitarGain` in the audio graph on purpose — muting the guitar for the mic
    must not take the metronome with it.

@@ -17,7 +17,7 @@
  *    silently playing nothing on the first press.
  */
 
-import { SAMPLE_CENTRES, SAMPLE_FOR_NOTE, sampleUrl } from "./samples";
+import { centresFor, INSTRUMENTS, sampleUrl, type InstrumentId } from "./samples";
 
 export type SamplerState = "idle" | "loading" | "ready" | "error";
 
@@ -37,9 +37,10 @@ export interface SamplePlayOptions {
 }
 
 export class GuitarSampler {
-  private buffers = new Map<number, AudioBuffer>();
-  private inflight: Promise<void> | null = null;
-  private _state: SamplerState = "idle";
+  /** instrument -> pitch centre -> decoded audio. */
+  private buffers = new Map<InstrumentId, Map<number, AudioBuffer>>();
+  private inflight = new Map<InstrumentId, Promise<void>>();
+  private states = new Map<InstrumentId, SamplerState>();
   private live = new Set<AudioBufferSourceNode>();
   /** Currently-sounding note per string, for voice stealing. */
   private voices = new Map<number, { src: AudioBufferSourceNode; gain: GainNode }>();
@@ -49,49 +50,59 @@ export class GuitarSampler {
     private destination: AudioNode,
   ) {}
 
-  get state(): SamplerState {
-    return this._state;
+  state(instrument: InstrumentId): SamplerState {
+    return this.states.get(instrument) ?? "idle";
   }
 
-  get ready(): boolean {
-    return this._state === "ready";
+  ready(instrument: InstrumentId): boolean {
+    return this.states.get(instrument) === "ready";
   }
 
-  /** Fetch and decode every sample. Safe to call repeatedly. */
-  load(): Promise<void> {
-    if (this.inflight) return this.inflight;
-    this._state = "loading";
+  /**
+   * Fetch and decode one instrument. Safe to call repeatedly and safe to call
+   * for several instruments at once — each has its own in-flight promise, so
+   * switching tone mid-download does not cancel or duplicate work.
+   */
+  load(instrument: InstrumentId): Promise<void> {
+    const existing = this.inflight.get(instrument);
+    if (existing) return existing;
+    this.states.set(instrument, "loading");
 
-    this.inflight = (async () => {
+    const job = (async () => {
       try {
+        const decoded = new Map<number, AudioBuffer>();
         await Promise.all(
-          SAMPLE_CENTRES.map(async (centre) => {
-            const res = await fetch(sampleUrl(centre));
-            if (!res.ok) throw new Error(`${res.status} for ${sampleUrl(centre)}`);
-            const bytes = await res.arrayBuffer();
-            this.buffers.set(centre, await this.ctx.decodeAudioData(bytes));
+          centresFor(instrument).map(async (centre) => {
+            const url = sampleUrl(instrument, centre);
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`${res.status} for ${url}`);
+            decoded.set(centre, await this.ctx.decodeAudioData(await res.arrayBuffer()));
           }),
         );
-        this._state = "ready";
+        this.buffers.set(instrument, decoded);
+        this.states.set(instrument, "ready");
       } catch {
         // Leave the caller to fall back to the synth; a practice tool that
         // goes silent because a download failed is worse than one that
         // sounds synthetic.
-        this._state = "error";
-        this.inflight = null;
+        this.states.set(instrument, "error");
+        this.inflight.delete(instrument);
       }
     })();
 
-    return this.inflight;
+    this.inflight.set(instrument, job);
+    return job;
   }
 
   /** Nearest sample we actually hold, for notes outside the generated map. */
-  private centreFor(midi: number): number | null {
-    const mapped = SAMPLE_FOR_NOTE[midi];
-    if (mapped !== undefined && this.buffers.has(mapped)) return mapped;
+  private centreFor(instrument: InstrumentId, midi: number): number | null {
+    const held = this.buffers.get(instrument);
+    if (!held) return null;
+    const mapped = INSTRUMENTS[instrument].notes[midi];
+    if (mapped !== undefined && held.has(mapped)) return mapped;
     let best: number | null = null;
     let bestDistance = Infinity;
-    for (const centre of this.buffers.keys()) {
+    for (const centre of held.keys()) {
       const d = Math.abs(centre - midi);
       if (d < bestDistance) {
         bestDistance = d;
@@ -101,9 +112,9 @@ export class GuitarSampler {
     return best;
   }
 
-  play(midi: number, opts: SamplePlayOptions = {}): boolean {
-    const centre = this.centreFor(Math.round(midi));
-    const buffer = centre === null ? undefined : this.buffers.get(centre);
+  play(instrument: InstrumentId, midi: number, opts: SamplePlayOptions = {}): boolean {
+    const centre = this.centreFor(instrument, Math.round(midi));
+    const buffer = centre === null ? undefined : this.buffers.get(instrument)?.get(centre);
     if (!buffer || centre === null) return false;
 
     const ctx = this.ctx;

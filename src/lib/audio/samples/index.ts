@@ -1,0 +1,67 @@
+/**
+ * The sampled instruments StrumLab ships.
+ *
+ * Adding one is two steps and touches nothing else:
+ *   1. python3 scripts/build-samples.py <id> <extracted-library-dir>
+ *   2. add an entry below
+ *
+ * The per-instrument note maps are generated; this file is the hand-written
+ * registry that names them, credits them, and records their licence. Keeping
+ * provenance next to the data means the credit cannot quietly drift away from
+ * the files it describes.
+ */
+
+import { ACOUSTIC_NOTES } from "./acoustic";
+import { ELECTRIC_NOTES } from "./electric";
+
+export type InstrumentId = "acoustic" | "electric";
+
+export interface Instrument {
+  id: InstrumentId;
+  /** Shown on the tone control. */
+  label: string;
+  /** One honest line about what it actually is. */
+  blurb: string;
+  credit: string;
+  licence: string;
+  /** MIDI note -> pitch centre of the recording covering it. */
+  notes: Record<number, number>;
+}
+
+export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
+  acoustic: {
+    id: "acoustic",
+    label: "Acoustic",
+    // Said plainly because it matters: this is a nylon-strung classical
+    // guitar. It is a real acoustic, but a steel-string dreadnought is what
+    // most strumming patterns are written for and it sounds noticeably
+    // different. See README for why a steel-string is not bundled.
+    blurb: "Nylon-string classical guitar. Warm and round — lovely fingerpicked, mellower than a steel-string for strumming.",
+    credit: "FreePats Spanish classical guitar, recorded by roberto@zenvoid.org, 2008",
+    licence: "CC0 1.0",
+    notes: ACOUSTIC_NOTES,
+  },
+  electric: {
+    id: "electric",
+    label: "Electric",
+    blurb: "A Fender through a clean amp, bridge pickup.",
+    credit: "FreePats Electric Guitar FSBS (clean), direct-sampled Fender",
+    licence: "CC0 1.0",
+    notes: ELECTRIC_NOTES,
+  },
+};
+
+export const INSTRUMENT_IDS = Object.keys(INSTRUMENTS) as InstrumentId[];
+
+export function isInstrument(value: string): value is InstrumentId {
+  return value in INSTRUMENTS;
+}
+
+export function sampleUrl(instrument: InstrumentId, centreMidi: number): string {
+  return `/samples/${instrument}/${centreMidi}.flac`;
+}
+
+/** Distinct files for one instrument, for preloading. */
+export function centresFor(instrument: InstrumentId): number[] {
+  return Array.from(new Set(Object.values(INSTRUMENTS[instrument].notes))).sort((a, b) => a - b);
+}

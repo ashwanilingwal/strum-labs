@@ -19,9 +19,6 @@ Published under the terms of Creative Commons CC0 public domain dedication:
 https://creativecommons.org/publicdomain/zero/1.0/
 
 ---
-Bundled in StrumLab. Only the 22 samples reachable from the chord library are
-included, out of the 48 in the original set. Regenerate with:
-
-    python3 scripts/build-samples.py /path/to/SpanishClassicalGuitar-SFZ+FLAC-20190618
-
-CC0 1.0 full text: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+Bundled in StrumLab: only the samples reachable from the chord library.
+Regenerate: python3 scripts/build-samples.py acoustic <library-dir>
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/legalcode
