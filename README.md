@@ -19,8 +19,16 @@ settings slide over the deck rather than living on a separate page.
   tracks your position in the loop.
 - **The lane** — the pattern as slots. Skipped slots still draw a faint
   direction arrow, because the strumming hand never stops moving.
+- **The feedback** — while the mic is listening, a verdict on every strum:
+  a flashing pass/fail glyph and a meter holding your last 16 strums as a
+  scatter. Appears only when listening; the screen is otherwise unchanged.
 - **The transport** — play, tempo, what you hear, and the microphone.
 - **Settings** — the pattern builder, sound, listening and (optionally) account.
+
+Each slot also carries its own mark as it goes past: a coloured ring, a badge
+(tight / close / loose / missed) and its timing error in milliseconds. A missed
+slot is desaturated and dashed, so "nothing heard there" reads differently from
+"played, but badly" — they are different mistakes with different fixes.
 
 ## How the timing works
 
@@ -81,20 +89,33 @@ so an absolute score means very little on its own.
 ```
 src/
   lib/
-    music/      theory, chords, pattern     — pure, no React, no audio
-    audio/      engine (Karplus-Strong), transport
+    music/      theory, chords, pattern      — pure, no React, no audio
+    audio/      engine (Karplus-Strong), transport, perform
     listen/     fft, dsp, mic, detector, scoring
+    feedback/   presentation                 — how a verdict looks and reads
     storage/    local store, settings, cloud sync
     supabase/   optional auth
   hooks/        useStrumEngine, useAccount
-  components/   the screen
+  components/   the screen, plus Backdrop
 ```
 
-`lib/music` and `lib/listen` are deliberately free of React and of Web Audio, so
-they can be tested directly and reused for the chord-progression, song and
-fingerpicking work later. `Pattern.slotsPerBar` is a field rather than a
-constant for the same reason: the editor only offers eighths today, but
-sixteenths and triplets already work everywhere downstream.
+`lib/music`, `lib/listen` and `lib/feedback` are deliberately free of React and
+of Web Audio, so they can be tested directly and reused for the
+chord-progression, song and fingerpicking work later. `Pattern.slotsPerBar` is a
+field rather than a constant for the same reason: the editor only offers
+eighths today, but sixteenths and triplets already work everywhere downstream.
+
+Three files exist purely as seams, because they are where changes land:
+
+- `lib/audio/perform.ts` — what a slot *sounds* like. Adding fingerpicking or
+  per-string plucks is an edit here, not in the scheduler.
+- `lib/feedback/presentation.ts` — every verdict colour, glyph, phrase and the
+  timing-meter geometry. No component knows what "close" means in milliseconds.
+- `components/Backdrop.tsx` — the entire decorative background. Nothing else
+  references its classes, so the look is replaceable in one file.
+
+**`AGENTS.md` carries a "to change X, open Y" table and the invariants.** Start
+there rather than reading the tree.
 
 ## Saving
 
