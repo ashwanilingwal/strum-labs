@@ -12,17 +12,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getEngine } from "@/lib/audio/engine";
+import { performSlot } from "@/lib/audio/perform";
 import { Transport } from "@/lib/audio/transport";
-import { chordById, chordMidiNotes } from "@/lib/music/chords";
-import {
-  beatSlots, chordAtSlot, isAudible, slotSeconds, type Pattern,
-} from "@/lib/music/pattern";
+import { beatSlots, slotSeconds, type Pattern } from "@/lib/music/pattern";
 import { OnsetDetector, type Onset, type RoomProfile } from "@/lib/listen/detector";
 import { MicError, openMic, type MicCapture } from "@/lib/listen/mic";
 import {
   emptyStats, estimateOffsetMs, Scorer,
   type Grade, type SessionStats, type SlotVerdict,
 } from "@/lib/listen/scoring";
+
+/** One matched strum, kept for the timing scatter. */
+export interface RecentHit {
+  errorMs: number;
+  grade: Grade;
+}
 import type { AudioSettings, ListenSettings } from "@/lib/storage/settings";
 
 export type MicStatus = "off" | "opening" | "calibrating" | "listening" | "error";
@@ -47,7 +51,13 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   const [micMessage, setMicMessage] = useState<string | null>(null);
   const [room, setRoom] = useState<RoomProfile | null>(null);
   const [level, setLevel] = useState(-90);
-  const [verdicts, setVerdicts] = useState<Record<number, Grade>>({});
+  // Keyed by slot, holding the whole verdict rather than just its grade: the
+  // lane shows the timing error and the chord/stroke checks inline, and
+  // widening this later (per-string detail, say) should not need a new channel.
+  const [verdicts, setVerdicts] = useState<Record<number, SlotVerdict>>({});
+  const [lastVerdict, setLastVerdict] = useState<SlotVerdict | null>(null);
+  const [verdictSeq, setVerdictSeq] = useState(0);
+  const [recent, setRecent] = useState<RecentHit[]>([]);
   const [stats, setStats] = useState<SessionStats>(emptyStats());
   const [heard, setHeard] = useState<HeardNote | null>(null);
 
@@ -76,23 +86,8 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     ({ slot, cycle, time }: { slot: number; cycle: number; time: number }) => {
       const p = patternRef.current;
       const a = audioRef.current;
-      const stroke = p.strokes[slot];
 
-      if (a.click && slot % (p.slotsPerBar / p.beatsPerBar) === 0) {
-        engine.click(time, slot % p.slotsPerBar === 0);
-      }
-
-      if (a.guitar && isAudible(stroke)) {
-        const chord = chordById(chordAtSlot(p, slot));
-        if (chord) {
-          engine.strum(chordMidiNotes(chord), stroke === "U" ? "up" : "down", {
-            at: time,
-            gain: p.accents.includes(slot) ? 0.85 : 0.62,
-            muted: stroke === "X",
-          });
-        }
-      }
-
+      performSlot(engine, p, slot, time, { guitar: a.guitar, click: a.click });
       scorerRef.current?.expect(slot, cycle, time);
       uiQueue.current.push({ slot, time });
     },
@@ -153,6 +148,8 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
     scorerRef.current?.reset();
     setVerdicts({});
+    setLastVerdict(null);
+    setRecent([]);
     setStats(emptyStats());
 
     const transport = ensureTransport();
@@ -215,8 +212,15 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   // ---- microphone --------------------------------------------------------
 
   const handleVerdict = useCallback((v: SlotVerdict, s: SessionStats) => {
-    if (v.slot >= 0) setVerdicts((prev) => ({ ...prev, [v.slot]: v.grade }));
+    if (v.slot >= 0) setVerdicts((prev) => ({ ...prev, [v.slot]: v }));
     setStats(s);
+    setLastVerdict(v);
+    // A monotonic counter drives the flash, not the verdict object: two
+    // identical verdicts in a row must still re-trigger the animation.
+    setVerdictSeq((n) => n + 1);
+    if (v.grade !== "missed" && v.grade !== "extra") {
+      setRecent((prev) => [...prev.slice(-15), { errorMs: v.errorMs, grade: v.grade }]);
+    }
   }, []);
 
   const handleOnset = useCallback((o: Onset) => {
@@ -239,6 +243,8 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     setMicMessage(null);
     setLevel(-90);
     setVerdicts({});
+    setLastVerdict(null);
+    setRecent([]);
   }, []);
 
   const startListening = useCallback(async () => {
@@ -308,7 +314,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     playing, activeSlot, countIn, toggle, start, stop,
     micStatus, micMessage, room, level, listening: micStatus === "listening",
     startListening, stopListening, recalibrate, absorbBias,
-    verdicts, stats, heard,
+    verdicts, lastVerdict, verdictSeq, recent, stats, heard,
     beats: beatSlots(pattern),
   };
 }

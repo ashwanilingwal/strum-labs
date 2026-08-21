@@ -3,11 +3,11 @@
 import { useMemo } from "react";
 
 /** Tonearm layout, in the overlay's 0-100 coordinate space. */
-const PIVOT_X = 99;
-const PIVOT_Y = 3;
-const ARM_LEN = 70;
-const OUTER_DEG = 103;
-const INNER_DEG = 127;
+const PIVOT_X = 95;
+const PIVOT_Y = 7;
+const ARM_LEN = 66;
+const OUTER_DEG = 102;
+const INNER_DEG = 126;
 import type { Chord } from "@/lib/music/chords";
 import type { Pattern } from "@/lib/music/pattern";
 

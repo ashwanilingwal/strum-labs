@@ -9,6 +9,7 @@ import { activePattern, appStore, type AppState } from "@/lib/storage/settings";
 import { touchLocal, useAccount } from "@/hooks/useAccount";
 import { useStrumEngine } from "@/hooks/useStrumEngine";
 import { ChordDiagram } from "./ChordDiagram";
+import { LiveFeedback } from "./LiveFeedback";
 import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
 import { TransportBar } from "./TransportBar";
@@ -75,8 +76,15 @@ export function StrumLab() {
 
   const showVerdicts = engine.micStatus === "listening";
 
+  // The chord the last-scored slot was asking for, so the feedback line can say
+  // "heard Em, wanted G" rather than just "wrong chord".
+  const lastWantChord =
+    engine.lastVerdict && engine.lastVerdict.slot >= 0
+      ? pattern.chords[barOfSlot(pattern, engine.lastVerdict.slot)]
+      : null;
+
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col gap-3 p-3 sm:p-4 lg:h-dvh lg:overflow-hidden">
+    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-3 p-3 sm:p-5 lg:h-dvh lg:overflow-hidden lg:p-7">
       <div className="bezel flex min-h-0 flex-1 flex-col">
         <div className="bezel-inner scanlines relative flex min-h-0 flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-4">
           <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
@@ -115,6 +123,17 @@ export function StrumLab() {
                   showVerdicts={showVerdicts}
                 />
               </div>
+
+              {showVerdicts ? (
+                <LiveFeedback
+                  lastVerdict={engine.lastVerdict}
+                  verdictSeq={engine.verdictSeq}
+                  recent={engine.recent}
+                  wantChord={lastWantChord}
+                  meanErrorMs={engine.stats.meanErrorMs}
+                  hits={engine.stats.hits}
+                />
+              ) : null}
 
               {showVerdicts ? (
                 <ScoreStrip

@@ -3,16 +3,20 @@
 import {
   countLabels, handDirection, type Pattern, type Stroke,
 } from "@/lib/music/pattern";
-import type { Grade } from "@/lib/listen/scoring";
+import type { SlotVerdict } from "@/lib/listen/scoring";
+import { gradeVisual, signedMs } from "@/lib/feedback/presentation";
 
 /**
  * The pattern as a lane of slots, with the playhead and — when the mic is on —
- * a per-slot verdict.
+ * a live verdict on each slot as it goes past.
  *
  * Skipped slots still draw a faint hand-direction arrow. That is the single
  * most important piece of teaching in the whole screen: the strumming hand
  * never stops moving, it just misses the strings, and a lane that shows only
  * the strokes you play teaches the opposite.
+ *
+ * Verdict colours and glyphs come from lib/feedback/presentation so that this
+ * component never has to know what "close" means in milliseconds.
  */
 
 const GLYPH: Record<Stroke, string> = { D: "↓", U: "↑", X: "✕", "-": "" };
@@ -25,7 +29,7 @@ export function StrumLane({
 }: {
   pattern: Pattern;
   activeSlot: number;
-  verdicts: Record<number, Grade>;
+  verdicts: Record<number, SlotVerdict>;
   showVerdicts: boolean;
 }) {
   const labels = countLabels(pattern.slotsPerBar, pattern.beatsPerBar);
@@ -49,16 +53,17 @@ export function StrumLane({
               const stroke = pattern.strokes[index];
               const active = index === activeSlot;
               const verdict = showVerdicts ? verdicts[index] : undefined;
+              const visual = verdict ? gradeVisual(verdict.grade) : null;
               const dir = handDirection(pattern.slotsPerBar, pattern.beatsPerBar, index);
               return (
                 <div key={index} className="min-w-0">
                   <div
                     className={[
-                      "slot flex h-11 items-center justify-center sm:h-14",
+                      "slot relative flex h-11 items-center justify-center sm:h-14",
                       SLOT_CLASS[stroke],
                       pattern.accents.includes(index) ? "slot-accent" : "",
                       active ? "slot-active" : "",
-                      verdict ? `verdict-${verdict}` : "",
+                      visual ? visual.className : "",
                     ].join(" ")}
                   >
                     <span
@@ -66,13 +71,41 @@ export function StrumLane({
                     >
                       {stroke === "-" ? (dir === "down" ? "↓" : "↑") : GLYPH[stroke]}
                     </span>
+
+                    {visual ? (
+                      <span
+                        key={`${index}-${verdict!.grade}-${verdict!.cycle}`}
+                        className="verdict-badge"
+                        style={{ color: visual.color, borderColor: visual.color }}
+                        aria-label={visual.label}
+                      >
+                        {visual.glyph}
+                      </span>
+                    ) : null}
+
+                    {/* Chord and stroke mistakes are marked separately from
+                        timing, because they are a different thing to fix. */}
+                    {verdict?.chordOk === false ? (
+                      <span className="verdict-flag" style={{ background: "var(--magenta)" }} title="Wrong chord">
+                        {verdict.heardChord ?? "?"}
+                      </span>
+                    ) : verdict?.strokeOk === false ? (
+                      <span className="verdict-flag" style={{ background: "var(--violet)" }} title="Wrong direction">
+                        {verdict.slot >= 0 && stroke === "D" ? "↑" : "↓"}
+                      </span>
+                    ) : null}
                   </div>
+
                   <div
-                    className={`mt-1 text-center font-lcd text-[10px] sm:text-xs ${
+                    className={`mt-1 text-center font-lcd text-[10px] leading-tight sm:text-xs ${
                       active ? "text-cream" : "text-fg-dim"
                     }`}
                   >
-                    {labels[i]}
+                    {verdict && verdict.grade !== "missed" ? (
+                      <span style={{ color: visual!.color }}>{signedMs(verdict.errorMs)}</span>
+                    ) : (
+                      labels[i]
+                    )}
                   </div>
                 </div>
               );

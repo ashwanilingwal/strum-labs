@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Orbitron, Chakra_Petch, Share_Tech_Mono } from "next/font/google";
+import { Backdrop } from "@/components/Backdrop";
 import "./globals.css";
 
 const orbitron = Orbitron({ variable: "--font-orbitron", subsets: ["latin"], weight: ["500", "700", "900"] });
@@ -21,7 +22,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${orbitron.variable} ${chakra.variable} ${lcd.variable} h-full antialiased`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <Backdrop />
+        {children}
+      </body>
     </html>
   );
 }
