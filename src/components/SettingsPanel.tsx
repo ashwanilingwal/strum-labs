@@ -1,0 +1,292 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { emptyPattern, newPatternId, PRESETS, type Pattern } from "@/lib/music/pattern";
+import type { AppState } from "@/lib/storage/settings";
+import type { MicStatus } from "@/hooks/useStrumEngine";
+import type { RoomProfile } from "@/lib/listen/detector";
+import type { SyncStatus } from "@/hooks/useAccount";
+import { PatternEditor } from "./PatternEditor";
+import { SectionTitle, SegmentedControl, Slider, Toggle } from "./ui";
+
+/**
+ * Everything configurable, in one sheet over the deck. Nothing here is a
+ * separate page — the whole app is one screen, and settings slide over it.
+ */
+
+export function SettingsPanel({
+  open, onClose, state, pattern, setState, setPattern,
+  micStatus, room, onRecalibrate, onZeroLatency, canZero,
+  account,
+}: {
+  open: boolean;
+  onClose: () => void;
+  state: AppState;
+  pattern: Pattern;
+  setState: (updater: (prev: AppState) => AppState) => void;
+  setPattern: (p: Pattern) => void;
+  micStatus: MicStatus;
+  room: RoomProfile | null;
+  onRecalibrate: () => void;
+  onZeroLatency: () => void;
+  canZero: boolean;
+  account: {
+    configured: boolean;
+    email: string | null;
+    status: SyncStatus;
+    signIn: () => void;
+    signOut: () => void;
+  };
+}) {
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    closeRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const selectPattern = (id: string) => setState((s) => ({ ...s, activeId: id }));
+
+  const addPattern = (base: Pattern) => {
+    const copy: Pattern = { ...base, id: newPatternId(), name: `${base.name} copy` };
+    setState((s) => ({ ...s, patterns: [...s.patterns, copy], activeId: copy.id }));
+  };
+
+  const deletePattern = (id: string) => {
+    setState((s) => {
+      if (s.patterns.length <= 1) return s;
+      const patterns = s.patterns.filter((p) => p.id !== id);
+      return { ...s, patterns, activeId: patterns[0].id };
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end">
+      <button
+        type="button"
+        aria-label="Close settings"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Settings"
+        className="relative flex h-full w-full max-w-lg flex-col border-l border-line bg-[color:var(--night)]/95 shadow-2xl"
+      >
+        <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
+          <h2 className="chrome-text font-display text-lg font-black uppercase tracking-[0.18em]">
+            Settings
+          </h2>
+          <button ref={closeRef} type="button" onClick={onClose} className="btn btn-icon" aria-label="Close settings">
+            ✕
+          </button>
+        </header>
+
+        <div className="flex-1 space-y-6 overflow-y-auto p-4">
+          <section>
+            <SectionTitle
+              right={
+                <button type="button" className="btn !px-2.5 !py-1 text-[11px]" onClick={() => addPattern(emptyPattern())}>
+                  + New
+                </button>
+              }
+            >
+              Your patterns
+            </SectionTitle>
+            <div className="panel divide-y divide-[color:var(--line-soft)] p-1">
+              {state.patterns.map((p) => (
+                <div key={p.id} className="flex items-center gap-2 px-2 py-1.5">
+                  <button
+                    type="button"
+                    onClick={() => selectPattern(p.id)}
+                    className="min-w-0 flex-1 text-left"
+                  >
+                    <span className={`block truncate text-sm font-semibold ${p.id === state.activeId ? "text-cyan" : ""}`}>
+                      {p.name}
+                    </span>
+                    <span className="block truncate font-lcd text-[10px] text-fg-dim">
+                      {p.bars} bar{p.bars > 1 ? "s" : ""} · {p.chords.join(" ")} · {p.bpm} bpm
+                    </span>
+                  </button>
+                  <button type="button" className="btn !px-2 !py-1 text-[11px]" onClick={() => addPattern(p)}>
+                    Copy
+                  </button>
+                  <button
+                    type="button"
+                    className="btn !px-2 !py-1 text-[11px]"
+                    onClick={() => deletePattern(p.id)}
+                    disabled={state.patterns.length <= 1}
+                  >
+                    Delete
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {PRESETS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  className="btn !px-2.5 !py-1 text-[11px]"
+                  onClick={() => addPattern(p)}
+                >
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <PatternEditor pattern={pattern} onChange={setPattern} />
+
+          <section>
+            <SectionTitle>Sound</SectionTitle>
+            <div className="panel divide-y divide-[color:var(--line-soft)] py-1">
+              <Toggle
+                label="Guitar"
+                hint="Hear the chords played back"
+                on={state.audio.guitar}
+                onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, guitar: v } }))}
+              />
+              <Toggle
+                label="Metronome click"
+                on={state.audio.click}
+                onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, click: v } }))}
+              />
+              <Slider
+                label="Guitar volume"
+                readout={`${Math.round(state.audio.volume * 100)}%`}
+                value={state.audio.volume} min={0} max={1} step={0.01}
+                onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, volume: v } }))}
+              />
+              <Slider
+                label="Click volume"
+                readout={`${Math.round(state.audio.clickVolume * 100)}%`}
+                value={state.audio.clickVolume} min={0} max={1} step={0.01}
+                onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, clickVolume: v } }))}
+              />
+              <SegmentedControl
+                label="Tone"
+                value={state.audio.tone}
+                options={[{ id: "acoustic", label: "Acoustic" }, { id: "electric", label: "Electric" }]}
+                onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, tone: v } }))}
+              />
+              <SegmentedControl
+                label="Count-in"
+                value={String(state.audio.countInBars)}
+                options={[{ id: "0", label: "None" }, { id: "1", label: "1 bar" }, { id: "2", label: "2 bars" }]}
+                onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, countInBars: Number(v) } }))}
+              />
+            </div>
+          </section>
+
+          <section>
+            <SectionTitle>Listening</SectionTitle>
+            <div className="panel space-y-1 py-1">
+              {room ? (
+                <div className="px-3 py-2">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span
+                      className="h-2 w-2 rounded-full"
+                      style={{
+                        background:
+                          room.quality === "quiet" ? "var(--lime)"
+                            : room.quality === "usable" ? "var(--amber)"
+                            : "var(--rose)",
+                      }}
+                    />
+                    <span className="text-sm font-semibold capitalize">{room.quality} room</span>
+                    <span className="ml-auto font-lcd text-[11px] text-fg-dim">
+                      {room.noiseDb.toFixed(0)} dB
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed text-fg-muted">{room.message}</p>
+                </div>
+              ) : (
+                <p className="px-3 py-2 text-xs text-fg-dim">
+                  Turn on listening from the transport bar. It measures the room for two seconds
+                  first, so keep quiet while it does.
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="btn mx-3 text-xs"
+                onClick={onRecalibrate}
+                disabled={micStatus !== "listening"}
+              >
+                Measure the room again
+              </button>
+
+              <Toggle
+                label="Check the chord"
+                hint="Flags when you play a different chord than the bar asks for"
+                on={state.listen.checkChord}
+                onChange={(v) => setState((s) => ({ ...s, listen: { ...s.listen, checkChord: v } }))}
+              />
+              <Toggle
+                label="Check up vs down"
+                hint="Guesses stroke direction from the attack. Experimental"
+                on={state.listen.checkStroke}
+                onChange={(v) => setState((s) => ({ ...s, listen: { ...s.listen, checkStroke: v } }))}
+              />
+              <Slider
+                label="Latency offset"
+                readout={`${state.listen.offsetMs} ms`}
+                value={state.listen.offsetMs} min={-150} max={250} step={1}
+                onChange={(v) => setState((s) => ({ ...s, listen: { ...s.listen, offsetMs: v } }))}
+              />
+              <p className="px-3 pb-2 text-[11px] leading-relaxed text-fg-dim">
+                Your microphone, driver and speakers each add a fixed delay. If every strum reads
+                late by about the same amount, that is this number, not your playing.
+              </p>
+              <button type="button" className="btn mx-3 mb-2 text-xs" onClick={onZeroLatency} disabled={!canZero}>
+                Zero it from my last few strums
+              </button>
+            </div>
+          </section>
+
+          {account.configured ? (
+            <section>
+              <SectionTitle>Account</SectionTitle>
+              <div className="panel p-3">
+                {account.email ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">{account.email}</p>
+                      <p className="text-xs text-fg-dim">
+                        {account.status === "synced" ? "Patterns saved to your account"
+                          : account.status === "syncing" ? "Saving…"
+                          : account.status === "error" ? "Couldn't save — will retry"
+                          : "Saved on this device"}
+                      </p>
+                    </div>
+                    <button type="button" className="btn text-xs" onClick={account.signOut}>
+                      Sign out
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs text-fg-muted">
+                      Your patterns are saved in this browser. Sign in to keep them across devices.
+                    </p>
+                    <button type="button" className="btn btn-lit shrink-0 text-xs" onClick={account.signIn}>
+                      Sign in
+                    </button>
+                  </div>
+                )}
+              </div>
+            </section>
+          ) : null}
+        </div>
+      </aside>
+    </div>
+  );
+}

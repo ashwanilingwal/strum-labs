@@ -1,0 +1,385 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   StrumLab theme — Y2K hi-fi: chrome bezels, gloss, brass and vinyl.
+   Every colour and every surface treatment is declared here as a token or a
+   utility class. Components reference them by name, so re-skinning the whole
+   app is an edit to this file rather than a sweep through the components.
+   ========================================================================== */
+
+:root {
+  --ink: #08040f;
+  --night: #150a2e;
+  --night-2: #1e0f3d;
+  --deck: #241246;
+
+  --chrome-1: #fbfdff;
+  --chrome-2: #cdd7e6;
+  --chrome-3: #94a2b8;
+  --chrome-4: #5b6679;
+  --chrome-5: #2c3242;
+
+  --cyan: #3fe9ff;
+  --cyan-deep: #0d8ba8;
+  --magenta: #ff5ad4;
+  --violet: #a77bff;
+  --lime: #c6ff4a;
+  --amber: #ffb545;
+  --brass: #e9b45f;
+  --brass-deep: #8c5c1c;
+  --cream: #f7edd9;
+  --rose: #ff6b6b;
+
+  --fg: #f3ecff;
+  --fg-muted: #b4a6d6;
+  --fg-dim: #7d6ea6;
+
+  --line: rgba(167, 123, 255, 0.28);
+  --line-soft: rgba(167, 123, 255, 0.14);
+
+  --radius: 14px;
+}
+
+@theme inline {
+  --color-ink: var(--ink);
+  --color-night: var(--night);
+  --color-deck: var(--deck);
+  --color-cyan: var(--cyan);
+  --color-magenta: var(--magenta);
+  --color-violet: var(--violet);
+  --color-lime: var(--lime);
+  --color-amber: var(--amber);
+  --color-brass: var(--brass);
+  --color-cream: var(--cream);
+  --color-rose: var(--rose);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-dim: var(--fg-dim);
+  --color-line: var(--line);
+  --font-display: var(--font-orbitron);
+  --font-sans: var(--font-chakra);
+  --font-lcd: var(--font-lcd);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--ink);
+  color: var(--fg);
+  font-family: var(--font-chakra), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+  background-image:
+    radial-gradient(ellipse 70% 55% at 18% -5%, rgba(63, 233, 255, 0.16), transparent 70%),
+    radial-gradient(ellipse 60% 50% at 88% 8%, rgba(255, 90, 212, 0.14), transparent 70%),
+    radial-gradient(ellipse 90% 60% at 50% 108%, rgba(167, 123, 255, 0.16), transparent 70%),
+    linear-gradient(175deg, var(--night-2) 0%, var(--ink) 60%);
+  background-attachment: fixed;
+}
+
+::selection {
+  background: var(--cyan);
+  color: var(--ink);
+}
+
+/* --- chrome: the brushed-metal fill used for bezels and rails -------------- */
+.chrome {
+  background: linear-gradient(
+    180deg,
+    var(--chrome-1) 0%,
+    var(--chrome-2) 18%,
+    var(--chrome-4) 49%,
+    var(--chrome-3) 52%,
+    var(--chrome-2) 78%,
+    var(--chrome-5) 100%
+  );
+}
+
+.chrome-text {
+  background: linear-gradient(180deg, #ffffff 0%, #d9e6f5 38%, #7f8ea6 52%, #f2f7ff 70%, #9fb0c8 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+}
+
+/* --- bezel: a raised metal frame around a sunken panel -------------------- */
+.bezel {
+  border-radius: 20px;
+  padding: 3px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.85), rgba(160, 175, 200, 0.35) 30%, rgba(20, 24, 36, 0.9) 62%, rgba(200, 214, 235, 0.5));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5) inset,
+    0 18px 40px -18px rgba(0, 0, 0, 0.9),
+    0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+.bezel-inner {
+  border-radius: 17px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0) 42%),
+    linear-gradient(170deg, var(--deck), var(--night) 55%, var(--ink));
+  box-shadow:
+    0 2px 14px rgba(0, 0, 0, 0.7) inset,
+    0 0 0 1px rgba(167, 123, 255, 0.22) inset;
+}
+
+/* --- panel: a translucent aqua-glass card -------------------------------- */
+.panel {
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.02) 40%, rgba(0, 0, 0, 0.16)),
+    rgba(36, 18, 70, 0.55);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.4) inset,
+    0 10px 26px -14px rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(7px);
+}
+
+.panel-sunken {
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.22));
+  border: 1px solid rgba(0, 0, 0, 0.55);
+  box-shadow:
+    0 2px 10px rgba(0, 0, 0, 0.6) inset,
+    0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* --- buttons: glossy Y2K pills ------------------------------------------- */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 999px;
+  padding: 9px 18px;
+  font-family: var(--font-chakra), sans-serif;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--fg);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.06) 45%, rgba(0, 0, 0, 0.28));
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.42) inset,
+    0 -2px 6px rgba(0, 0, 0, 0.4) inset,
+    0 6px 16px -8px rgba(0, 0, 0, 0.9);
+  cursor: pointer;
+  transition: transform 90ms ease, filter 140ms ease, box-shadow 140ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.btn:hover:not(:disabled) { filter: brightness(1.15); }
+.btn:active:not(:disabled) { transform: translateY(1px) scale(0.985); }
+.btn:disabled { opacity: 0.42; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+.btn-lit {
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.75), rgba(255, 255, 255, 0.1) 44%, rgba(0, 0, 0, 0.2)),
+    linear-gradient(180deg, var(--cyan), var(--cyan-deep));
+  border-color: rgba(255, 255, 255, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.35);
+}
+
+.btn-hot {
+  color: var(--ink);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.08) 44%, rgba(0, 0, 0, 0.22)),
+    linear-gradient(180deg, var(--magenta), #b8228f);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.btn-icon { padding: 9px; width: 40px; height: 40px; }
+
+/* --- LCD readout ---------------------------------------------------------- */
+.lcd {
+  font-family: var(--font-lcd), ui-monospace, monospace;
+  color: var(--lime);
+  background: linear-gradient(180deg, #0a1508, #061003);
+  border-radius: 8px;
+  border: 1px solid rgba(198, 255, 74, 0.28);
+  box-shadow:
+    0 0 14px rgba(198, 255, 74, 0.18) inset,
+    0 2px 8px rgba(0, 0, 0, 0.7) inset;
+  text-shadow: 0 0 8px rgba(198, 255, 74, 0.7);
+  letter-spacing: 0.06em;
+}
+
+/* --- the record ----------------------------------------------------------- */
+.vinyl {
+  border-radius: 50%;
+  background:
+    repeating-radial-gradient(circle at 50% 50%,
+      rgba(255, 255, 255, 0.055) 0 1px,
+      rgba(0, 0, 0, 0) 1px 4px),
+    radial-gradient(circle at 50% 50%, #241a33 0 30%, #120c1c 30.4% 92%, #241a33 92.4% 100%),
+    #0d0812;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.09),
+    0 24px 44px -20px rgba(0, 0, 0, 0.95),
+    0 0 60px -22px rgba(167, 123, 255, 0.55);
+}
+
+/* The moving specular sheen that sells it as a spinning disc. */
+.vinyl-sheen {
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0) 0deg,
+    rgba(63, 233, 255, 0.16) 32deg,
+    rgba(255, 255, 255, 0) 74deg,
+    rgba(255, 255, 255, 0) 190deg,
+    rgba(255, 90, 212, 0.16) 224deg,
+    rgba(255, 255, 255, 0) 268deg
+  );
+  mix-blend-mode: screen;
+}
+
+.vinyl-label {
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0) 55%),
+    linear-gradient(160deg, var(--brass) 0%, #f4d69a 34%, var(--brass) 58%, var(--brass-deep) 100%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 6px 16px -6px rgba(0, 0, 0, 0.9);
+  color: #3a2404;
+}
+
+.spin { animation: spin var(--spin-duration, 1.8s) linear infinite; }
+.spin-paused { animation-play-state: paused; }
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- slot lane ------------------------------------------------------------ */
+.slot {
+  position: relative;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.3));
+  transition: transform 110ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.slot-down {
+  background: linear-gradient(180deg, rgba(63, 233, 255, 0.42), rgba(13, 139, 168, 0.22));
+  border-color: rgba(63, 233, 255, 0.6);
+}
+
+.slot-up {
+  background: linear-gradient(180deg, rgba(255, 90, 212, 0.4), rgba(168, 33, 128, 0.2));
+  border-color: rgba(255, 90, 212, 0.58);
+}
+
+.slot-mute {
+  background: linear-gradient(180deg, rgba(255, 181, 69, 0.38), rgba(140, 92, 28, 0.2));
+  border-color: rgba(255, 181, 69, 0.55);
+}
+
+.slot-skip {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(0, 0, 0, 0.28));
+  border-style: dashed;
+  border-color: rgba(180, 166, 214, 0.32);
+}
+
+.slot-active {
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 0 0 2px var(--cream), 0 0 22px rgba(247, 237, 217, 0.5);
+}
+
+.slot-accent::after {
+  content: "";
+  position: absolute;
+  inset-inline: 30%;
+  top: -6px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--cream);
+  box-shadow: 0 0 8px var(--cream);
+}
+
+/* verdict tints applied by the mic scorer */
+.verdict-tight { box-shadow: 0 0 0 2px var(--lime), 0 0 18px rgba(198, 255, 74, 0.5); }
+.verdict-close { box-shadow: 0 0 0 2px var(--amber), 0 0 16px rgba(255, 181, 69, 0.45); }
+.verdict-loose { box-shadow: 0 0 0 2px var(--rose), 0 0 16px rgba(255, 107, 107, 0.4); }
+.verdict-missed { box-shadow: 0 0 0 2px rgba(125, 110, 166, 0.9) ; opacity: 0.6; }
+
+/* --- misc ----------------------------------------------------------------- */
+.hairline { background: linear-gradient(90deg, transparent, var(--line), transparent); height: 1px; }
+
+.scanlines::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background: repeating-linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.035) 0 1px,
+    rgba(255, 255, 255, 0) 1px 3px
+  );
+}
+
+.starburst {
+  background: conic-gradient(
+    from 0deg,
+    rgba(255, 255, 255, 0.22) 0 6deg, transparent 6deg 24deg,
+    rgba(255, 255, 255, 0.22) 24deg 30deg, transparent 30deg 48deg,
+    rgba(255, 255, 255, 0.22) 48deg 54deg, transparent 54deg 72deg,
+    rgba(255, 255, 255, 0.22) 72deg 78deg, transparent 78deg 96deg
+  );
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 22px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.62), rgba(0, 0, 0, 0.28));
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.16), 0 2px 6px rgba(0, 0, 0, 0.6) inset;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #c6d2e2 45%, #79879d);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff, #8b97ac);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin { animation: none; }
+  * { transition-duration: 1ms !important; }
+}

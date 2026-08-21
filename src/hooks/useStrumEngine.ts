@@ -1,0 +1,314 @@
+"use client";
+
+/**
+ * The runtime: transport, synth, metronome, microphone and scoring, wired
+ * together and exposed to React as plain state.
+ *
+ * The rule this file follows throughout is that **React never decides when a
+ * sound happens**. The transport books every note against the audio clock
+ * ahead of time; React is told afterwards, from a rAF loop, purely so the
+ * screen can catch up. Anything else drifts audibly within a few bars.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getEngine } from "@/lib/audio/engine";
+import { Transport } from "@/lib/audio/transport";
+import { chordById, chordMidiNotes } from "@/lib/music/chords";
+import {
+  beatSlots, chordAtSlot, isAudible, slotSeconds, type Pattern,
+} from "@/lib/music/pattern";
+import { OnsetDetector, type Onset, type RoomProfile } from "@/lib/listen/detector";
+import { MicError, openMic, type MicCapture } from "@/lib/listen/mic";
+import {
+  emptyStats, estimateOffsetMs, Scorer,
+  type Grade, type SessionStats, type SlotVerdict,
+} from "@/lib/listen/scoring";
+import type { AudioSettings, ListenSettings } from "@/lib/storage/settings";
+
+export type MicStatus = "off" | "opening" | "calibrating" | "listening" | "error";
+
+export interface HeardNote {
+  chord: string | null;
+  confidence: number;
+  stroke: "down" | "up";
+  at: number;
+}
+
+const CALIBRATION_MS = 2200;
+
+export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: ListenSettings) {
+  const engine = useMemo(() => getEngine(), []);
+
+  const [playing, setPlaying] = useState(false);
+  const [activeSlot, setActiveSlot] = useState(-1);
+  const [countIn, setCountIn] = useState(0);
+
+  const [micStatus, setMicStatus] = useState<MicStatus>("off");
+  const [micMessage, setMicMessage] = useState<string | null>(null);
+  const [room, setRoom] = useState<RoomProfile | null>(null);
+  const [level, setLevel] = useState(-90);
+  const [verdicts, setVerdicts] = useState<Record<number, Grade>>({});
+  const [stats, setStats] = useState<SessionStats>(emptyStats());
+  const [heard, setHeard] = useState<HeardNote | null>(null);
+
+  // Live copies for the scheduling callbacks, which must not be rebuilt on
+  // every render — recreating them would tear down and restart the transport.
+  // Written from an effect rather than during render: the audio callbacks only
+  // ever run after commit, so a post-render write is soon enough.
+  const patternRef = useRef(pattern);
+  const audioRef = useRef(audio);
+  const listenRef = useRef(listen);
+  useEffect(() => { patternRef.current = pattern; }, [pattern]);
+  useEffect(() => { audioRef.current = audio; }, [audio]);
+  useEffect(() => { listenRef.current = listen; }, [listen]);
+
+  const transportRef = useRef<Transport | null>(null);
+  const scorerRef = useRef<Scorer | null>(null);
+  const detectorRef = useRef<OnsetDetector | null>(null);
+  const captureRef = useRef<MicCapture | null>(null);
+  /** Slot changes queued against audio time, drained by the rAF loop. */
+  const uiQueue = useRef<{ slot: number; time: number }[]>([]);
+  const rafRef = useRef(0);
+
+  // ---- transport ---------------------------------------------------------
+
+  const handleSlot = useCallback(
+    ({ slot, cycle, time }: { slot: number; cycle: number; time: number }) => {
+      const p = patternRef.current;
+      const a = audioRef.current;
+      const stroke = p.strokes[slot];
+
+      if (a.click && slot % (p.slotsPerBar / p.beatsPerBar) === 0) {
+        engine.click(time, slot % p.slotsPerBar === 0);
+      }
+
+      if (a.guitar && isAudible(stroke)) {
+        const chord = chordById(chordAtSlot(p, slot));
+        if (chord) {
+          engine.strum(chordMidiNotes(chord), stroke === "U" ? "up" : "down", {
+            at: time,
+            gain: p.accents.includes(slot) ? 0.85 : 0.62,
+            muted: stroke === "X",
+          });
+        }
+      }
+
+      scorerRef.current?.expect(slot, cycle, time);
+      uiQueue.current.push({ slot, time });
+    },
+    [engine],
+  );
+
+  const ensureTransport = useCallback(() => {
+    if (!transportRef.current) {
+      transportRef.current = new Transport({
+        slotCount: patternRef.current.strokes.length,
+        slotSeconds: () => slotSeconds(patternRef.current, patternRef.current.bpm),
+        now: () => engine.currentTime,
+        onSlot: handleSlot,
+      });
+    }
+    return transportRef.current;
+  }, [engine, handleSlot]);
+
+  // Tempo and pattern edits take effect on the next scheduled slot.
+  useEffect(() => {
+    transportRef.current?.update({
+      slotCount: pattern.strokes.length,
+      slotSeconds: () => slotSeconds(patternRef.current, patternRef.current.bpm),
+    });
+    scorerRef.current?.update(pattern, pattern.bpm);
+  }, [pattern]);
+
+  useEffect(() => {
+    engine.setVolume(audio.volume);
+    engine.setClickVolume(audio.clickVolume);
+    engine.setTone(audio.tone);
+  }, [engine, audio.volume, audio.clickVolume, audio.tone]);
+
+  useEffect(() => {
+    if (scorerRef.current) scorerRef.current.offsetMs = listen.offsetMs;
+  }, [listen.offsetMs]);
+
+  const stop = useCallback(() => {
+    transportRef.current?.stop();
+    engine.silence();
+    uiQueue.current = [];
+    setPlaying(false);
+    setActiveSlot(-1);
+    setCountIn(0);
+  }, [engine]);
+
+  const start = useCallback(async () => {
+    await engine.init();
+    const p = patternRef.current;
+    const a = audioRef.current;
+    const beat = 60 / p.bpm;
+    const t0 = engine.currentTime + 0.15;
+    const countBeats = a.countInBars * p.beatsPerBar;
+
+    for (let i = 0; i < countBeats; i++) {
+      engine.click(t0 + i * beat, i % p.beatsPerBar === 0);
+    }
+
+    scorerRef.current?.reset();
+    setVerdicts({});
+    setStats(emptyStats());
+
+    const transport = ensureTransport();
+    transport.start(t0 + countBeats * beat);
+    setPlaying(true);
+
+    if (countBeats > 0) {
+      setCountIn(countBeats);
+      // Purely cosmetic — the audio for the count-in is already booked.
+      for (let i = 0; i < countBeats; i++) {
+        const remaining = countBeats - i;
+        window.setTimeout(
+          () => setCountIn(remaining - 1 > 0 ? remaining - 1 : 0),
+          (t0 + i * beat - engine.currentTime) * 1000,
+        );
+      }
+    }
+  }, [engine, ensureTransport]);
+
+  const toggle = useCallback(() => {
+    if (playing) stop();
+    else void start();
+  }, [playing, start, stop]);
+
+  // ---- frame loop: screen catches up to the audio clock ------------------
+
+  useEffect(() => {
+    if (!playing) return;
+    let alive = true;
+
+    const frame = () => {
+      if (!alive) return;
+      const now = engine.currentTime;
+
+      // Reveal slots at the moment they actually sound.
+      let next = -1;
+      while (uiQueue.current.length && uiQueue.current[0].time <= now) {
+        next = uiQueue.current.shift()!.slot;
+      }
+      if (next >= 0) {
+        setActiveSlot(next);
+        // A fresh loop wipes last cycle's marks so the lane reads as "now".
+        if (next === 0) setVerdicts({});
+      }
+
+      scorerRef.current?.sweep(now);
+      const d = detectorRef.current;
+      if (d) setLevel(d.levelDb);
+
+      rafRef.current = requestAnimationFrame(frame);
+    };
+
+    rafRef.current = requestAnimationFrame(frame);
+    return () => {
+      alive = false;
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [playing, engine]);
+
+  // ---- microphone --------------------------------------------------------
+
+  const handleVerdict = useCallback((v: SlotVerdict, s: SessionStats) => {
+    if (v.slot >= 0) setVerdicts((prev) => ({ ...prev, [v.slot]: v.grade }));
+    setStats(s);
+  }, []);
+
+  const handleOnset = useCallback((o: Onset) => {
+    const l = listenRef.current;
+    setHeard({
+      chord: l.checkChord ? o.chordGuess : null,
+      confidence: o.chordConfidence,
+      stroke: o.stroke,
+      at: o.time,
+    });
+    scorerRef.current?.hear(o);
+  }, []);
+
+  const stopListening = useCallback(() => {
+    captureRef.current?.stop();
+    captureRef.current = null;
+    detectorRef.current = null;
+    scorerRef.current = null;
+    setMicStatus("off");
+    setMicMessage(null);
+    setLevel(-90);
+    setVerdicts({});
+  }, []);
+
+  const startListening = useCallback(async () => {
+    setMicMessage(null);
+    setMicStatus("opening");
+    try {
+      await engine.init();
+      const ctx = engine.context!;
+      const detector = new OnsetDetector(ctx.sampleRate, handleOnset);
+      detectorRef.current = detector;
+
+      const capture = await openMic(ctx, ({ time, samples }) => {
+        detectorRef.current?.push(time, samples);
+      });
+      captureRef.current = capture;
+
+      scorerRef.current = new Scorer(
+        patternRef.current,
+        patternRef.current.bpm,
+        listenRef.current.offsetMs || estimateOffsetMs(ctx),
+        handleVerdict,
+      );
+
+      // Measure the room before trusting anything it says.
+      setMicStatus("calibrating");
+      detector.beginCalibration();
+      await new Promise((r) => window.setTimeout(r, CALIBRATION_MS));
+      if (detectorRef.current !== detector) return; // torn down mid-calibration
+      const profile = detector.endCalibration();
+      setRoom(profile);
+      detector.reset();
+      setMicStatus("listening");
+    } catch (err) {
+      stopListening();
+      setMicStatus("error");
+      setMicMessage(err instanceof MicError ? err.message : "The microphone couldn't be started.");
+    }
+  }, [engine, handleOnset, handleVerdict, stopListening]);
+
+  const recalibrate = useCallback(async () => {
+    const detector = detectorRef.current;
+    if (!detector) return;
+    setMicStatus("calibrating");
+    detector.beginCalibration();
+    await new Promise((r) => window.setTimeout(r, CALIBRATION_MS));
+    if (detectorRef.current !== detector) return;
+    setRoom(detector.endCalibration());
+    detector.reset();
+    setMicStatus("listening");
+  }, []);
+
+  /** Zero out a consistent early/late bias measured from the player's own hits. */
+  const absorbBias = useCallback((): number | null => {
+    const s = scorerRef.current;
+    if (!s || stats.hits < 8) return null;
+    const corrected = Math.round(s.offsetMs + stats.meanErrorMs);
+    s.offsetMs = corrected;
+    return corrected;
+  }, [stats.hits, stats.meanErrorMs]);
+
+  useEffect(() => () => {
+    transportRef.current?.stop();
+    captureRef.current?.stop();
+  }, []);
+
+  return {
+    playing, activeSlot, countIn, toggle, start, stop,
+    micStatus, micMessage, room, level, listening: micStatus === "listening",
+    startListening, stopListening, recalibrate, absorbBias,
+    verdicts, stats, heard,
+    beats: beatSlots(pattern),
+  };
+}
