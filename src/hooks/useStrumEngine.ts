@@ -28,6 +28,7 @@ export interface RecentHit {
   grade: Grade;
 }
 import type { AudioSettings, ListenSettings } from "@/lib/storage/settings";
+import type { SamplerState } from "@/lib/audio/sampler";
 
 export type MicStatus = "off" | "opening" | "calibrating" | "listening" | "error";
 
@@ -47,6 +48,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   const [activeSlot, setActiveSlot] = useState(-1);
   const [countIn, setCountIn] = useState(0);
 
+  const [sampleState, setSampleState] = useState<SamplerState>("idle");
   const [micStatus, setMicStatus] = useState<MicStatus>("off");
   const [micMessage, setMicMessage] = useState<string | null>(null);
   const [room, setRoom] = useState<RoomProfile | null>(null);
@@ -121,9 +123,52 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     engine.setTone(audio.tone);
   }, [engine, audio.volume, audio.clickVolume, audio.tone]);
 
+  /**
+   * Pull the ~2 MB of recordings down once the acoustic tone is in play. It
+   * cannot start before the AudioContext exists (decoding needs it), so this
+   * is driven by the engine being live rather than by mount.
+   */
+  const fetchSamples = useCallback(async () => {
+    if (audioRef.current.tone !== "acoustic") return;
+    if (engine.sampleState === "ready" || engine.sampleState === "loading") return;
+    setSampleState("loading");
+    await engine.loadSamples();
+    setSampleState(engine.sampleState);
+  }, [engine]);
+
+  useEffect(() => {
+    // Only possible once the AudioContext exists, which needs a user gesture —
+    // so this covers switching tone mid-session; the first load is kicked off
+    // by start()/startListening() instead.
+    if (audio.tone !== "acoustic" || !engine.ready) return;
+    let alive = true;
+    void (async () => {
+      // Yield first: updating state synchronously in an effect body cascades
+      // an extra render, and there is nothing to show in that render anyway.
+      await Promise.resolve();
+      if (alive) await fetchSamples();
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [audio.tone, engine, fetchSamples]);
+
   useEffect(() => {
     if (scorerRef.current) scorerRef.current.offsetMs = listen.offsetMs;
   }, [listen.offsetMs]);
+
+  // The app's own guitar reaching the microphone is the single biggest source
+  // of phantom strums. "mute" is the only fully reliable answer, so it is the
+  // default; the others are opt-in and documented as best-effort.
+  const listening = micStatus === "listening";
+  useEffect(() => {
+    const shouldDuck = listening && listen.duckMode === "mute";
+    engine.setGuitarDuck(shouldDuck);
+    if (scorerRef.current) {
+      scorerRef.current.duckMode = listen.duckMode;
+      scorerRef.current.guitarAudible = audio.guitar && !shouldDuck;
+    }
+  }, [engine, listening, listen.duckMode, audio.guitar]);
 
   const stop = useCallback(() => {
     transportRef.current?.stop();
@@ -136,6 +181,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
   const start = useCallback(async () => {
     await engine.init();
+    void fetchSamples();
     const p = patternRef.current;
     const a = audioRef.current;
     const beat = 60 / p.bpm;
@@ -167,7 +213,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
         );
       }
     }
-  }, [engine, ensureTransport]);
+  }, [engine, ensureTransport, fetchSamples]);
 
   const toggle = useCallback(() => {
     if (playing) stop();
@@ -235,6 +281,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   }, []);
 
   const stopListening = useCallback(() => {
+    engine.setGuitarDuck(false);
     captureRef.current?.stop();
     captureRef.current = null;
     detectorRef.current = null;
@@ -245,13 +292,14 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     setVerdicts({});
     setLastVerdict(null);
     setRecent([]);
-  }, []);
+  }, [engine]);
 
   const startListening = useCallback(async () => {
     setMicMessage(null);
     setMicStatus("opening");
     try {
       await engine.init();
+      void fetchSamples();
       const ctx = engine.context!;
       const detector = new OnsetDetector(ctx.sampleRate, handleOnset);
       detectorRef.current = detector;
@@ -261,12 +309,15 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       });
       captureRef.current = capture;
 
-      scorerRef.current = new Scorer(
+      const scorer = new Scorer(
         patternRef.current,
         patternRef.current.bpm,
         listenRef.current.offsetMs || estimateOffsetMs(ctx),
         handleVerdict,
       );
+      scorer.duckMode = listenRef.current.duckMode;
+      scorer.guitarAudible = audioRef.current.guitar && listenRef.current.duckMode !== "mute";
+      scorerRef.current = scorer;
 
       // Measure the room before trusting anything it says.
       setMicStatus("calibrating");
@@ -282,7 +333,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       setMicStatus("error");
       setMicMessage(err instanceof MicError ? err.message : "The microphone couldn't be started.");
     }
-  }, [engine, handleOnset, handleVerdict, stopListening]);
+  }, [engine, fetchSamples, handleOnset, handleVerdict, stopListening]);
 
   const recalibrate = useCallback(async () => {
     const detector = detectorRef.current;
@@ -312,7 +363,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
   return {
     playing, activeSlot, countIn, toggle, start, stop,
-    micStatus, micMessage, room, level, listening: micStatus === "listening",
+    micStatus, micMessage, room, level, listening, sampleState,
     startListening, stopListening, recalibrate, absorbBias,
     verdicts, lastVerdict, verdictSeq, recent, stats, heard,
     beats: beatSlots(pattern),

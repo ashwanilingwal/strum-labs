@@ -4,6 +4,8 @@ import { useEffect, useRef } from "react";
 import { emptyPattern, newPatternId, PRESETS, type Pattern } from "@/lib/music/pattern";
 import type { AppState } from "@/lib/storage/settings";
 import type { MicStatus } from "@/hooks/useStrumEngine";
+import type { SamplerState } from "@/lib/audio/sampler";
+import type { DuckMode } from "@/lib/storage/settings";
 import type { RoomProfile } from "@/lib/listen/detector";
 import type { SyncStatus } from "@/hooks/useAccount";
 import { PatternEditor } from "./PatternEditor";
@@ -16,7 +18,7 @@ import { SectionTitle, SegmentedControl, Slider, Toggle } from "./ui";
 
 export function SettingsPanel({
   open, onClose, state, pattern, setState, setPattern,
-  micStatus, room, onRecalibrate, onZeroLatency, canZero,
+  micStatus, sampleState, room, onRecalibrate, onZeroLatency, canZero,
   account,
 }: {
   open: boolean;
@@ -26,6 +28,7 @@ export function SettingsPanel({
   setState: (updater: (prev: AppState) => AppState) => void;
   setPattern: (p: Pattern) => void;
   micStatus: MicStatus;
+  sampleState: SamplerState;
   room: RoomProfile | null;
   onRecalibrate: () => void;
   onZeroLatency: () => void;
@@ -175,9 +178,33 @@ export function SettingsPanel({
               <SegmentedControl
                 label="Tone"
                 value={state.audio.tone}
-                options={[{ id: "acoustic", label: "Acoustic" }, { id: "electric", label: "Electric" }]}
+                options={[
+                  { id: "acoustic", label: "Acoustic" },
+                  { id: "electric", label: "Electric" },
+                ]}
                 onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, tone: v } }))}
               />
+              <p className="px-3 pb-2 text-[11px] leading-relaxed text-fg-dim">
+                {state.audio.tone === "acoustic" ? (
+                  <>
+                    Real recordings of a Spanish classical guitar, from the FreePats
+                    library (public domain).{" "}
+                    {sampleState === "loading" ? (
+                      <span className="text-amber">Downloading them now — about 2 MB, once.</span>
+                    ) : sampleState === "error" ? (
+                      <span className="text-rose">
+                        They failed to load, so you are hearing the synthesised fallback.
+                      </span>
+                    ) : sampleState === "ready" ? (
+                      <span className="text-lime">Loaded.</span>
+                    ) : (
+                      "They download the first time you press play."
+                    )}
+                  </>
+                ) : (
+                  "Synthesised with a plucked-string model. No download."
+                )}
+              </p>
               <SegmentedControl
                 label="Count-in"
                 value={String(state.audio.countInBars)}
@@ -237,6 +264,24 @@ export function SettingsPanel({
                 on={state.listen.checkStroke}
                 onChange={(v) => setState((s) => ({ ...s, listen: { ...s.listen, checkStroke: v } }))}
               />
+              <SegmentedControl
+                label="When the mic is listening"
+                value={state.listen.duckMode}
+                options={[
+                  { id: "mute" as DuckMode, label: "Mute guitar" },
+                  { id: "subtract" as DuckMode, label: "Subtract" },
+                  { id: "off" as DuckMode, label: "Leave it" },
+                ]}
+                onChange={(v) => setState((s) => ({ ...s, listen: { ...s.listen, duckMode: v } }))}
+              />
+              <p className="px-3 pb-2 text-[11px] leading-relaxed text-fg-dim">
+                {state.listen.duckMode === "mute"
+                  ? "The guitar part goes quiet while the mic judges, so the app can't hear itself and score its own playback as your strumming. The click keeps playing."
+                  : state.listen.duckMode === "subtract"
+                    ? "Keeps the guitar audible and tries to ignore onsets that are its own playback. Best effort only — a quiet, perfectly-timed strum looks exactly like bleed and can be dropped."
+                    : "Nothing is suppressed. Right on headphones; on speakers the app will score its own guitar as if you played it."}
+              </p>
+
               <Slider
                 label="Latency offset"
                 readout={`${state.listen.offsetMs} ms`}

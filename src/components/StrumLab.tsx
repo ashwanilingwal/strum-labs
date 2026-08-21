@@ -147,6 +147,11 @@ export function StrumLab() {
               {engine.micMessage ? (
                 <p className="panel px-3 py-2 text-xs text-rose">{engine.micMessage}</p>
               ) : null}
+              {engine.sampleState === "loading" ? (
+                <p className="panel px-3 py-2 text-xs text-fg-muted">
+                  Loading the recorded guitar — about 2 MB, once.
+                </p>
+              ) : null}
               {engine.micStatus === "calibrating" ? (
                 <p className="panel px-3 py-2 text-xs text-fg-muted">
                   Measuring the room — stay quiet for a moment.
@@ -188,6 +193,7 @@ export function StrumLab() {
         setState={setState}
         setPattern={setPattern}
         micStatus={engine.micStatus}
+        sampleState={engine.sampleState}
         room={engine.room}
         onRecalibrate={() => void engine.recalibrate()}
         canZero={engine.stats.hits >= 8}

@@ -12,8 +12,14 @@
  * the timing rock steady while React re-renders.
  */
 
+import { GuitarSampler, type SamplerState } from "./sampler";
 import { midiToFreq } from "../music/theory";
 
+/**
+ * "acoustic" plays real CC0 recordings of a Spanish classical guitar;
+ * "electric" is the Karplus-Strong model. Where samples are still loading or
+ * failed to load, acoustic falls back to the model rather than going silent.
+ */
 export type Tone = "acoustic" | "electric";
 
 const BUFFER_SECONDS = 2.6;
@@ -26,15 +32,23 @@ export interface PluckOptions {
   /** Hard cut-off, seconds. */
   duration?: number;
   pan?: number;
+  /** Physical string index, for voice stealing. See sampler.ts. */
+  voice?: number;
 }
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
   private bus: AudioNode | null = null;
+  /** Samples bypass the body EQ — the recording already contains a guitar. */
+  private sampleBus: GainNode | null = null;
+  /** Both guitar paths meet here, so ducking is a single node. */
+  private guitarGain: GainNode | null = null;
   private clickBus: GainNode | null = null;
+  private sampler: GuitarSampler | null = null;
   private buffers = new Map<string, AudioBuffer>();
   private live = new Set<AudioBufferSourceNode>();
+  private voices = new Map<number, { src: AudioBufferSourceNode; gain: GainNode }>();
   private _tone: Tone = "acoustic";
   private _volume = 0.75;
   private _clickVolume = 0.5;
@@ -83,12 +97,44 @@ export class AudioEngine {
     air.frequency.value = 3200;
     air.gain.value = -4;
 
-    body.connect(air).connect(this.master);
+    // Signal graph:
+    //   synth  -> body -> air -\
+    //                           guitarGain -> master -> destination
+    //   sample -> sampleBus ----/
+    //   click  -> clickBus ------------------> master
+    //
+    // The click deliberately sits outside guitarGain: ducking the guitar while
+    // the mic listens must not take the metronome with it.
+    this.guitarGain = ctx.createGain();
+    this.guitarGain.gain.value = 1;
+    this.guitarGain.connect(this.master);
+
+    body.connect(air).connect(this.guitarGain);
     this.bus = body;
+
+    this.sampleBus = ctx.createGain();
+    this.sampleBus.gain.value = 1;
+    this.sampleBus.connect(this.guitarGain);
 
     this.clickBus = ctx.createGain();
     this.clickBus.gain.value = this._clickVolume;
     this.clickBus.connect(this.master);
+
+    this.sampler = new GuitarSampler(ctx, this.sampleBus);
+  }
+
+  /** Kick off the ~2 MB sample download. Idempotent. */
+  loadSamples(): Promise<void> {
+    return this.sampler ? this.sampler.load() : Promise.resolve();
+  }
+
+  get sampleState(): SamplerState {
+    return this.sampler?.state ?? "idle";
+  }
+
+  /** True when the next note will be a real recording rather than the model. */
+  get usingSamples(): boolean {
+    return this._tone === "acoustic" && (this.sampler?.ready ?? false);
   }
 
   setVolume(v: number) {
@@ -112,6 +158,16 @@ export class AudioEngine {
   setTone(t: Tone) {
     this._tone = t;
     this.buffers.clear();
+  }
+
+  /**
+   * Duck the guitar without touching the player's volume setting. Used when
+   * the microphone is listening, so the app's own playback is not scored as
+   * the player's strumming.
+   */
+  setGuitarDuck(ducked: boolean) {
+    if (!this.ctx) return;
+    this.guitarGain?.gain.setTargetAtTime(ducked ? 0 : 1, this.ctx.currentTime, 0.02);
   }
 
   /** Render (and cache) one plucked string. */
@@ -161,9 +217,27 @@ export class AudioEngine {
 
   pluck(midi: number, opts: PluckOptions = {}) {
     if (!this.ctx || !this.bus) return;
+
+    // Real recording first; the model is the fallback, not the default.
+    if (this.usingSamples && this.sampler!.play(midi, opts)) return;
+
     const ctx = this.ctx;
     const at = Math.max(opts.at ?? ctx.currentTime, ctx.currentTime);
     const damping = clamp01(opts.damping ?? 0);
+
+    if (opts.voice !== undefined) {
+      const held = this.voices.get(opts.voice);
+      if (held) {
+        this.voices.delete(opts.voice);
+        try {
+          held.gain.gain.cancelScheduledValues(at);
+          held.gain.gain.setTargetAtTime(0, at, 0.012);
+          held.src.stop(at + 0.09);
+        } catch {
+          // Already stopped.
+        }
+      }
+    }
 
     const src = ctx.createBufferSource();
     src.buffer = this.buffer(Math.round(midi), damping);
@@ -189,6 +263,7 @@ export class AudioEngine {
     src.stop(end + 0.1);
 
     this.live.add(src);
+    if (opts.voice !== undefined) this.voices.set(opts.voice, { src, gain });
     src.onended = () => {
       this.live.delete(src);
       src.disconnect();
@@ -202,15 +277,22 @@ export class AudioEngine {
    * and the stagger — an up-strum is faster and usually hits fewer strings,
    * which is most of why it sounds different from a down-strum.
    */
-  strum(midis: number[], direction: "down" | "up", opts: { at?: number; gain?: number; muted?: boolean } = {}) {
+  strum(
+    midis: number[],
+    direction: "down" | "up",
+    opts: { at?: number; gain?: number; muted?: boolean; voices?: number[] } = {},
+  ) {
     if (!midis.length) return;
     const at = opts.at ?? this.currentTime;
     const muted = opts.muted ?? false;
-    const order = direction === "down" ? midis : [...midis].reverse();
+    // Keep each note paired with its string so reversing for an up-strum does
+    // not shuffle the voice assignments.
+    const pairs = midis.map((midi, i) => ({ midi, voice: opts.voices?.[i] ?? i }));
+    const order = direction === "down" ? pairs : [...pairs].reverse();
     const spread = muted ? 0.004 : direction === "down" ? 0.011 : 0.008;
     const base = opts.gain ?? 0.7;
 
-    order.forEach((midi, i) => {
+    order.forEach(({ midi, voice }, i) => {
       // Up-strums lean on the treble strings; downs lean on the bass.
       const positional = direction === "down" ? 1 - i * 0.03 : 0.82 - i * 0.02;
       this.pluck(midi, {
@@ -219,6 +301,7 @@ export class AudioEngine {
         damping: muted ? 0.95 : 0,
         duration: muted ? 0.14 : undefined,
         pan: (i / Math.max(1, order.length - 1) - 0.5) * 0.35,
+        voice,
       });
     });
   }
@@ -254,6 +337,8 @@ export class AudioEngine {
 
   /** Kill everything ringing — used when the transport stops. */
   silence() {
+    this.sampler?.silence();
+    this.voices.clear();
     for (const src of this.live) {
       try {
         src.stop();

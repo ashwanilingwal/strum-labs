@@ -22,6 +22,15 @@ export interface AudioSettings {
   countInBars: number;
 }
 
+/**
+ * What to do about the app's own guitar reaching the microphone.
+ *
+ * This matters more than it sounds. Echo cancellation is deliberately off (it
+ * mangles guitar), so on speakers the mic hears the app's playback and scores
+ * it as the player's strumming — and the better the samples, the worse it gets.
+ */
+export type DuckMode = "mute" | "subtract" | "off";
+
 export interface ListenSettings {
   /** Constant round-trip latency to subtract from detected onsets. */
   offsetMs: number;
@@ -29,6 +38,7 @@ export interface ListenSettings {
   checkChord: boolean;
   /** Judge up versus down. */
   checkStroke: boolean;
+  duckMode: DuckMode;
 }
 
 export interface AppState {
@@ -53,6 +63,9 @@ export const DEFAULT_LISTEN: ListenSettings = {
   offsetMs: 0,
   checkChord: true,
   checkStroke: true,
+  // Muting is the only option that is always correct. Subtraction is a
+  // best-effort guess, and leaving it playing is only right on headphones.
+  duckMode: "mute",
 };
 
 export function initialState(): AppState {

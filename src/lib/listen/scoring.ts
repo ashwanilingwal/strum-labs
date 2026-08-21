@@ -24,6 +24,13 @@ export type Grade = "tight" | "close" | "loose" | "missed" | "extra";
 export const TIGHT_MS = 30;
 export const CLOSE_MS = 70;
 
+/** How close to the app's own note an onset must be to be suspected bleed. */
+const BLEED_WINDOW_S = 0.022;
+/** How far above the quiet floor an onset must sit to be believed. */
+const BLEED_MARGIN_DB = 5;
+/** Onset levels kept for estimating that floor. */
+const LEVEL_HISTORY = 24;
+
 export interface SlotVerdict {
   slot: number;
   cycle: number;
@@ -75,6 +82,12 @@ export class Scorer {
   private verdicts: SlotVerdict[] = [];
   private stats: SessionStats = emptyStats();
 
+  /** Recent onset levels, used to estimate what the bleed floor sounds like. */
+  private levels: number[] = [];
+  /** Set by the caller: is the app's own guitar actually audible right now? */
+  public guitarAudible = false;
+  public duckMode: "mute" | "subtract" | "off" = "mute";
+
   constructor(
     private pattern: Pattern,
     private bpm: number,
@@ -82,6 +95,34 @@ export class Scorer {
     public offsetMs: number,
     private onVerdict: (v: SlotVerdict, stats: SessionStats) => void,
   ) {}
+
+  /**
+   * Is this onset probably the app hearing its own playback?
+   *
+   * Only asked in "subtract" mode. Two conditions must both hold: the onset
+   * lands almost exactly where the app played a note, and it is no louder than
+   * the quiet end of what we have been hearing. Bleed through a speaker is
+   * consistent and quiet; a guitar in the room is markedly louder.
+   *
+   * This cannot be perfect. A quiet, perfectly-timed strum looks exactly like
+   * bleed, and will occasionally be dropped — which is why muting is the
+   * default and this is opt-in.
+   */
+  private looksLikeBleed(onset: Onset, t: number): boolean {
+    if (this.duckMode !== "subtract" || !this.guitarAudible) return false;
+
+    const coincides = this.expectations.some((e) => Math.abs(t - e.time) <= BLEED_WINDOW_S);
+    if (!coincides) return false;
+
+    this.levels.push(onset.levelDb);
+    if (this.levels.length > LEVEL_HISTORY) this.levels.shift();
+    if (this.levels.length < 6) return false;
+
+    // The 25th percentile approximates "the quiet ones", i.e. the bleed.
+    const sorted = [...this.levels].sort((a, b) => a - b);
+    const floor = sorted[Math.floor(sorted.length * 0.25)];
+    return onset.levelDb < floor + BLEED_MARGIN_DB;
+  }
 
   get tolerance(): number {
     // Never let the match window exceed half a slot, or a strum can be
@@ -96,6 +137,7 @@ export class Scorer {
 
   reset() {
     this.expectations = [];
+    this.levels = [];
     this.errors = [];
     this.verdicts = [];
     this.stats = emptyStats();
@@ -126,6 +168,11 @@ export class Scorer {
   /** Called for every detected attack. */
   hear(onset: Onset) {
     const t = onset.time - this.offsetMs / 1000;
+
+    // Dropped silently: it is neither a hit nor an extra, because we do not
+    // believe the player made it. The slot stays open and can still be missed.
+    if (this.looksLikeBleed(onset, t)) return;
+
     let best: Expectation | null = null;
     let bestErr = Infinity;
     for (const e of this.expectations) {

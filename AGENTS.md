@@ -20,14 +20,16 @@ Find your row, open that file, stop. None of these require reading the rest.
 | --- | --- | --- |
 | What a slot **sounds** like | `lib/audio/perform.ts` | One function. Fingerpicking, per-string plucks and drum sounds all go here. |
 | **When** things happen | `lib/audio/transport.ts` | Lookahead scheduler. Don't move timing into React. |
-| The **synth** itself | `lib/audio/engine.ts` | Karplus-Strong. `pluck`, `strum`, `click`. |
+| The **synth** itself | `lib/audio/engine.ts` | Karplus-Strong. `pluck`, `strum`, `click`. Also owns the audio graph and the duck node. |
+| **Sampled** guitar playback | `lib/audio/sampler.ts` | Real recordings. Voice stealing lives here. |
+| Which **sample** covers which note | `lib/audio/samples.ts` | Generated — do not hand-edit. Run `scripts/build-samples.py`. |
 | Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
 | The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
 | Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
 | How strums are **detected** | `lib/listen/detector.ts` | Thresholds live at the top as named constants. |
 | Spectral **maths** | `lib/listen/dsp.ts`, `lib/listen/fft.ts` | Pure, no Web Audio, directly testable. |
 | **Mic setup** / permissions | `lib/listen/mic.ts` | Includes the AudioWorklet source. |
-| How a strum is **judged** | `lib/listen/scoring.ts` | `TIGHT_MS`, `CLOSE_MS`, latency offset, missed/extra logic. |
+| How a strum is **judged** | `lib/listen/scoring.ts` | `TIGHT_MS`, `CLOSE_MS`, latency offset, missed/extra, bleed rejection. |
 | How a verdict **looks or reads** | `lib/feedback/presentation.ts` | Colours, glyphs, wording, meter geometry. No component hardcodes these. |
 | The **background** | `components/Backdrop.tsx` + the backdrop block in `globals.css` | Self-contained. Nothing else references those classes. |
 | **Theme** colours | `:root` in `globals.css` | Every surface is a token or a utility class. |
@@ -60,3 +62,9 @@ Break these and things fail in ways that are hard to trace back.
    4/12/16 already work end to end. Don't hardcode 8.
 7. **Nothing is gated behind sign-in.** localStorage is the working copy;
    an account only adds sync.
+8. **One voice per string.** Samples ring for up to 5 seconds; without the
+   voice stealing in `sampler.ts` and `engine.ts`, a bar of eighths stacks ~48
+   simultaneous notes into mush. Re-striking a string must damp the last one.
+9. **The click never gets ducked with the guitar.** It sits outside
+   `guitarGain` in the audio graph on purpose — muting the guitar for the mic
+   must not take the metronome with it.

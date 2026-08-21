@@ -41,6 +41,46 @@ a `requestAnimationFrame` loop that reveals each slot at the moment it sounds.
 Anything driven from `setInterval` + `setState` drifts audibly within a few bars
 and stalls outright in a background tab.
 
+## The guitar sound
+
+The acoustic tone is **real recordings**, not synthesis: a Spanish classical
+guitar from the [FreePats](https://freepats.zenvoid.org/Guitar/acoustic-guitar.html)
+library, recorded by roberto@zenvoid.org in 2008 with an AKG Perception 120 and
+released under **CC0 1.0** — public domain, no attribution required, commercial
+use permitted. The electric tone stays synthesised, where a synthetic edge is
+honest rather than a compromise.
+
+Only the 22 samples the chord library can actually reach are shipped (~2 MB of
+the original 5 MB set); `scripts/build-samples.py` regenerates that subset and
+`lib/audio/samples.ts` from the library's own `.sfz` key map.
+
+They are **FLAC**, deliberately. FLAC is lossless and carries no encoder delay
+at the head of the file, where MP3 and AAC both prepend padding. Measured in the
+browser, these decode with 0–0.1 ms of leading silence, so an attack lands
+exactly where it was scheduled. In a timing trainer that is not a detail.
+
+Notes ring for up to five seconds, so each string gets **one voice**: re-striking
+a string damps whatever it was playing, as a real one does. Without that, a bar
+of eighths stacks around 48 overlapping notes. Measured on the real engine, the
+cap holds peak polyphony at 12.
+
+## Hearing itself
+
+The app plays a guitar while listening through a microphone, with echo
+cancellation deliberately off. On speakers it will otherwise hear its own
+playback and score it as your strumming — and better samples make that worse,
+not better.
+
+Three options, in `Settings → Listening`:
+
+- **Mute guitar** (default) — the guitar part goes quiet while the mic judges.
+  The click keeps playing. The only option that is always correct.
+- **Subtract** — keeps the guitar audible and drops onsets that land on the
+  app's own notes and are no louder than the quiet end of what it's been
+  hearing. Best effort: a quiet, perfectly-timed strum looks exactly like
+  bleed and will occasionally be dropped.
+- **Leave it** — nothing suppressed. Right on headphones, wrong on speakers.
+
 ## How the listening works
 
 There is no server and no R — the analysis is all local, because the timestamp

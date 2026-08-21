@@ -10,7 +10,7 @@
  * given and never reads the clock, so the caller keeps full control of timing.
  */
 
-import { chordById, chordMidiNotes } from "../music/chords";
+import { chordById, chordMidiNotes, soundingStrings } from "../music/chords";
 import { chordAtSlot, isAudible, type Pattern } from "../music/pattern";
 import type { AudioEngine } from "./engine";
 
@@ -57,5 +57,7 @@ export function performSlot(
     at: time,
     gain: pattern.accents.includes(slot) ? 0.85 : 0.62,
     muted: stroke === "X",
+    // Which physical string each note is on, so re-striking damps the last one.
+    voices: soundingStrings(chord),
   });
 }
