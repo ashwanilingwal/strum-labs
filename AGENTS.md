@@ -10,7 +10,19 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # StrumLab
 
-One screen: chords, metronome, audio, settings. Nothing else belongs on it.
+Four routes:
+
+| Route | What it is |
+| --- | --- |
+| `/` | Cover. One wordmark, one sentence, one way in. It does nothing else on purpose. |
+| `/play` | The practice screen — chords, metronome, audio, settings. |
+| `/chords` | Every chord as a browsable reference, tap to hear. |
+| `/patterns` | Saved patterns as cards with their stroke grid drawn. |
+
+The design is **flat editorial**: full-width blocks alternating black and lilac,
+inflated chrome type, flower confetti, tiny wide-tracked caps. There is no
+skeuomorphism left — the chrome bezels, gloss gradients and the turntable were
+removed deliberately.
 
 ## Where to change what
 
@@ -31,7 +43,11 @@ Find your row, open that file, stop. None of these require reading the rest.
 | **Mic setup** / permissions | `lib/listen/mic.ts` | Includes the AudioWorklet source. |
 | How a strum is **judged** | `lib/listen/scoring.ts` | `TIGHT_MS`, `CLOSE_MS`, latency offset, missed/extra, bleed rejection. |
 | How a verdict **looks or reads** | `lib/feedback/presentation.ts` | Colours, glyphs, wording, meter geometry. No component hardcodes these. |
-| The **background** | `components/Backdrop.tsx` + the backdrop block in `globals.css` | Self-contained. Nothing else references those classes. |
+| **Colours, type, every surface** | `:root` and `.block-light` in `globals.css` | Components name only semantic tokens (`--fg`, `--accent`, `--tight`). Re-skinning is this file alone. |
+| Dark vs light **ground** | add `.block-light` / `.block-dark` | Re-points the contextual tokens; children follow without knowing they moved. |
+| The **chrome lettering** | `.chrome-face` gradient in `globals.css`, `components/ui/ChromeText.tsx` | The hard mid-stops are what read as metal — a smooth ramp looks like plastic. |
+| **Flower confetti** | `components/ui/FlowerField.tsx` | Absolute, not fixed: blocks paint opaque, so a page-level layer behind them is invisible. Sections opt in with `relative` + `z-10` on their content. |
+| The **nav** | `components/ui/Nav.tsx` | The only chrome any page carries. |
 | **Theme** colours | `:root` in `globals.css` | Every surface is a token or a utility class. |
 | The **live feedback** UI | `components/LiveFeedback.tsx` | Big verdict + timing scatter. |
 | The **lane** | `components/StrumLane.tsx` | Playhead and per-slot verdicts. |

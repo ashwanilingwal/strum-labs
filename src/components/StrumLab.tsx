@@ -13,13 +13,20 @@ import { LiveFeedback } from "./LiveFeedback";
 import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
 import { TransportBar } from "./TransportBar";
-import { Turntable } from "./Turntable";
+import { ChromeText } from "./ui/ChromeText";
+import { FlowerField } from "./ui/FlowerField";
+import { Nav } from "./ui/Nav";
 
 /**
- * The whole app: chords, metronome, audio and settings on one screen.
+ * The practice screen: chords, metronome, audio and settings.
  *
- * State lives in an external store rather than component state so that the
- * server render and the first client render agree — see lib/storage/store.ts.
+ * Laid out as stacked full-width blocks alternating dark and light ground,
+ * with the chord name set in inflated chrome as the one large thing on screen.
+ * The turntable that used to hold that job is gone — the lane's playhead
+ * already says where you are in the loop, and the record was saying it twice.
+ *
+ * State lives in an external store rather than component state so the server
+ * render and the first client render agree — see lib/storage/store.ts.
  */
 
 export function StrumLab() {
@@ -68,121 +75,129 @@ export function StrumLab() {
   const bar = engine.activeSlot >= 0 ? barOfSlot(pattern, engine.activeSlot) : 0;
   const chord = chordById(pattern.chords[bar]);
   const nextChord = chordById(pattern.chords[(bar + 1) % pattern.bars]);
+  const showVerdicts = engine.micStatus === "listening";
+
+  const lastWantChord =
+    engine.lastVerdict && engine.lastVerdict.slot >= 0
+      ? pattern.chords[barOfSlot(pattern, engine.lastVerdict.slot)]
+      : null;
 
   const handleMic = () => {
     if (engine.micStatus === "off" || engine.micStatus === "error") void engine.startListening();
     else engine.stopListening();
   };
 
-  const showVerdicts = engine.micStatus === "listening";
-
-  // The chord the last-scored slot was asking for, so the feedback line can say
-  // "heard Em, wanted G" rather than just "wrong chord".
-  const lastWantChord =
-    engine.lastVerdict && engine.lastVerdict.slot >= 0
-      ? pattern.chords[barOfSlot(pattern, engine.lastVerdict.slot)]
-      : null;
+  const notices = [
+    engine.micMessage ? { tone: "loose", text: engine.micMessage } : null,
+    engine.sampleState === "loading" ? { tone: "close", text: "Loading the guitar recordings — about 2 MB, once." } : null,
+    engine.micStatus === "calibrating" ? { tone: "muted", text: "Measuring the room — stay quiet for a moment." } : null,
+    engine.room && engine.room.quality === "noisy" && engine.micStatus === "listening"
+      ? { tone: "close", text: engine.room.message } : null,
+    zeroed !== null ? { tone: "muted", text: `Latency offset set to ${zeroed} ms from your last few strums.` } : null,
+  ].filter(Boolean) as { tone: string; text: string }[];
 
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-5xl flex-col gap-3 p-3 sm:p-5 lg:h-dvh lg:overflow-hidden lg:p-7">
-      <div className="bezel flex min-h-0 flex-1 flex-col">
-        <div className="bezel-inner scanlines relative flex min-h-0 flex-1 flex-col gap-3 p-3 sm:gap-4 sm:p-4">
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)]">
-            <div className="flex items-center justify-center">
-              <Turntable
-                chord={chord}
-                nextChord={nextChord}
-                pattern={pattern}
-                playing={engine.playing}
-                activeSlot={engine.activeSlot}
-                countIn={engine.countIn}
-              />
-            </div>
+    <main className="block-dark flex min-h-dvh flex-col">
+      <Nav />
 
-            <div className="flex min-h-0 flex-col justify-center gap-3">
-              <div className="panel flex items-start gap-3 p-3 sm:gap-4 sm:p-4">
-                <div className="panel-sunken shrink-0 p-2">
-                  {chord ? <ChordDiagram chord={chord} size={124} /> : null}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-display text-3xl font-black leading-none text-brass sm:text-4xl">
-                    {chord?.symbol ?? "—"}
-                  </div>
-                  <div className="mt-0.5 text-xs uppercase tracking-widest text-fg-dim">
-                    {chord?.name}
-                  </div>
-                  <p className="mt-2 text-xs leading-relaxed text-fg-muted sm:text-sm">{chord?.tip}</p>
-                </div>
-              </div>
-
-              <div className="panel p-3">
-                <StrumLane
-                  pattern={pattern}
-                  activeSlot={engine.activeSlot}
-                  verdicts={engine.verdicts}
-                  showVerdicts={showVerdicts}
-                />
-              </div>
-
-              {showVerdicts ? (
-                <LiveFeedback
-                  lastVerdict={engine.lastVerdict}
-                  verdictSeq={engine.verdictSeq}
-                  recent={engine.recent}
-                  wantChord={lastWantChord}
-                  meanErrorMs={engine.stats.meanErrorMs}
-                  hits={engine.stats.hits}
-                />
-              ) : null}
-
-              {showVerdicts ? (
-                <ScoreStrip
-                  stats={engine.stats}
-                  heard={engine.heard}
-                  checkChord={state.listen.checkChord}
-                  checkStroke={state.listen.checkStroke}
-                />
-              ) : null}
-
-              {engine.micMessage ? (
-                <p className="panel px-3 py-2 text-xs text-rose">{engine.micMessage}</p>
-              ) : null}
-              {engine.sampleState === "loading" ? (
-                <p className="panel px-3 py-2 text-xs text-fg-muted">
-                  Loading the recorded guitar — about 2 MB, once.
-                </p>
-              ) : null}
-              {engine.micStatus === "calibrating" ? (
-                <p className="panel px-3 py-2 text-xs text-fg-muted">
-                  Measuring the room — stay quiet for a moment.
-                </p>
-              ) : null}
-              {engine.room && engine.room.quality === "noisy" && engine.micStatus === "listening" ? (
-                <p className="panel px-3 py-2 text-xs text-amber">{engine.room.message}</p>
-              ) : null}
-              {zeroed !== null ? (
-                <p className="panel px-3 py-2 text-xs text-fg-muted">
-                  Latency offset set to {zeroed} ms from your last few strums.
-                </p>
-              ) : null}
-            </div>
+      {/* Chord — the one big thing on the screen. */}
+      <section className="relative flex flex-1 flex-col justify-center gap-6 px-4 py-8 sm:px-8 lg:flex-row lg:items-center lg:gap-12">
+        <FlowerField density={0.5} />
+        <div className="relative z-10 min-w-0 flex-1">
+          <p className="caps text-fg-dim">
+            {engine.countIn > 0 ? "Count in" : engine.playing ? `Bar ${bar + 1} of ${pattern.bars}` : "Ready"}
+          </p>
+          <ChromeText className="mt-2 text-[clamp(5rem,20vw,15rem)]">
+            {engine.countIn > 0 ? String(engine.countIn) : (chord?.symbol ?? "—")}
+          </ChromeText>
+          <div className="mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-1">
+            <span className="caps-lg text-fg">{engine.countIn > 0 ? "Get ready" : chord?.name}</span>
+            {nextChord && nextChord.id !== chord?.id && engine.countIn === 0 ? (
+              <span className="caps text-fg-dim">
+                next <span className="text-accent">{nextChord.symbol}</span>
+              </span>
+            ) : null}
           </div>
-
-          <TransportBar
-            playing={engine.playing}
-            onToggle={engine.toggle}
-            bpm={pattern.bpm}
-            onBpm={setBpm}
-            click={state.audio.click}
-            onClick={(v) => setState((s) => ({ ...s, audio: { ...s.audio, click: v } }))}
-            guitar={state.audio.guitar}
-            onGuitar={(v) => setState((s) => ({ ...s, audio: { ...s.audio, guitar: v } }))}
-            micStatus={engine.micStatus}
-            onMic={handleMic}
-            onSettings={() => setSettingsOpen(true)}
-            level={engine.level}
-          />
+          {chord && engine.countIn === 0 ? (
+            <p className="mt-3 max-w-md text-sm leading-relaxed text-fg-muted">{chord.tip}</p>
+          ) : null}
         </div>
+
+        {chord ? (
+          <div className="block-light card-flat relative z-10 w-32 shrink-0 self-start p-3 sm:w-44 sm:p-4 lg:self-center">
+            <ChordDiagram chord={chord} size={168} />
+          </div>
+        ) : null}
+      </section>
+
+      {/* The pattern. Light ground so it reads as a separate object. */}
+      <section className="block-light px-4 py-6 sm:px-8">
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <span className="caps text-fg-dim">{pattern.name}</span>
+          <span className="caps text-fg-dim">
+            {pattern.bars} bar{pattern.bars > 1 ? "s" : ""} · {pattern.slotsPerBar === 8 ? "eighths" : `${pattern.slotsPerBar}ths`}
+          </span>
+        </div>
+        <StrumLane
+          pattern={pattern}
+          activeSlot={engine.activeSlot}
+          verdicts={engine.verdicts}
+          showVerdicts={showVerdicts}
+        />
+      </section>
+
+      {showVerdicts ? (
+        <section className="px-4 py-4 sm:px-8">
+          <LiveFeedback
+            lastVerdict={engine.lastVerdict}
+            verdictSeq={engine.verdictSeq}
+            recent={engine.recent}
+            wantChord={lastWantChord}
+            meanErrorMs={engine.stats.meanErrorMs}
+            hits={engine.stats.hits}
+          />
+          <ScoreStrip
+            stats={engine.stats}
+            checkChord={state.listen.checkChord}
+            checkStroke={state.listen.checkStroke}
+          />
+        </section>
+      ) : null}
+
+      {notices.length ? (
+        <div className="space-y-1 px-4 pb-2 sm:px-8">
+          {notices.map((n, i) => (
+            <p
+              key={i}
+              className="text-xs"
+              style={{ color: n.tone === "muted" ? "var(--fg-muted)" : `var(--${n.tone})` }}
+            >
+              {n.text}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
+      {/* The transport is sticky, so it overlays whatever sits beneath it once
+          the page is taller than the viewport. This reserves that space so the
+          lane is never hidden behind it on a phone. */}
+      <div aria-hidden="true" className="h-24 shrink-0 sm:h-0" />
+
+      <div className="sticky bottom-0 border-t border-line bg-ink/95 px-4 py-3 backdrop-blur sm:px-8">
+        <TransportBar
+          playing={engine.playing}
+          onToggle={engine.toggle}
+          bpm={pattern.bpm}
+          onBpm={setBpm}
+          click={state.audio.click}
+          onClick={(v) => setState((s) => ({ ...s, audio: { ...s.audio, click: v } }))}
+          guitar={state.audio.guitar}
+          onGuitar={(v) => setState((s) => ({ ...s, audio: { ...s.audio, guitar: v } }))}
+          micStatus={engine.micStatus}
+          onMic={handleMic}
+          onSettings={() => setSettingsOpen(true)}
+          level={engine.level}
+        />
       </div>
 
       <SettingsPanel
@@ -215,52 +230,32 @@ export function StrumLab() {
   );
 }
 
-/** Compact scoring readout. Only rendered while the mic is actually judging. */
+/** Session totals. Only rendered while the mic is judging. */
 function ScoreStrip({
-  stats, heard, checkChord, checkStroke,
+  stats, checkChord, checkStroke,
 }: {
   stats: ReturnType<typeof useStrumEngine>["stats"];
-  heard: ReturnType<typeof useStrumEngine>["heard"];
   checkChord: boolean;
   checkStroke: boolean;
 }) {
   const attempted = stats.hits + stats.missed;
+  const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : "—");
   return (
-    <div className="panel grid grid-cols-2 gap-2 p-2 text-center sm:grid-cols-4">
-      <Stat label="Tight" value={attempted ? `${Math.round((stats.tight / attempted) * 100)}%` : "—"} />
-      <Stat
-        label="Timing"
-        value={stats.hits ? `${stats.meanErrorMs > 0 ? "+" : ""}${stats.meanErrorMs.toFixed(0)} ms` : "—"}
-        hint={stats.hits ? `±${stats.spreadMs.toFixed(0)}` : undefined}
-      />
-      {checkChord ? (
-        <Stat
-          label="Chord"
-          value={stats.chordChecked ? `${Math.round((stats.chordRight / stats.chordChecked) * 100)}%` : "—"}
-          hint={heard?.chord ? `heard ${heard.chord}` : undefined}
-        />
-      ) : (
-        <Stat label="Missed" value={String(stats.missed)} />
-      )}
-      {checkStroke ? (
-        <Stat
-          label="Up / down"
-          value={stats.strokeChecked ? `${Math.round((stats.strokeRight / stats.strokeChecked) * 100)}%` : "—"}
-          hint={heard ? heard.stroke : undefined}
-        />
-      ) : (
-        <Stat label="Extra" value={String(stats.extra)} />
-      )}
+    <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2">
+      <Stat label="Tight" value={pct(stats.tight, attempted)} />
+      <Stat label="Missed" value={String(stats.missed)} />
+      <Stat label="Extra" value={String(stats.extra)} />
+      {checkChord ? <Stat label="Chord" value={pct(stats.chordRight, stats.chordChecked)} /> : null}
+      {checkStroke ? <Stat label="Up / down" value={pct(stats.strokeRight, stats.strokeChecked)} /> : null}
     </div>
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="panel-sunken px-2 py-1.5">
-      <div className="font-display text-[9px] uppercase tracking-[0.2em] text-fg-dim">{label}</div>
-      <div className="font-lcd text-base leading-tight text-lime">{value}</div>
-      {hint ? <div className="truncate text-[10px] text-fg-dim">{hint}</div> : null}
+    <div>
+      <div className="caps text-fg-dim">{label}</div>
+      <div className="num mt-0.5 text-xl text-fg">{value}</div>
     </div>
   );
 }

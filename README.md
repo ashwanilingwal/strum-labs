@@ -10,25 +10,48 @@ Runs entirely in the browser. No samples, no audio uploads, no server required.
 npm run dev
 ```
 
-## The one screen
+## The pages
 
-There is one route. Chords, metronome, audio and settings are all it contains;
-settings slide over the deck rather than living on a separate page.
+| Route | What it is |
+| --- | --- |
+| `/` | Cover — wordmark, one sentence, one button. Deliberately the only page that does nothing; a landing page that also tries to be a working surface is neither. |
+| `/play` | The practice screen. |
+| `/chords` | All 32 shapes, tap any card to hear it on the real recordings. |
+| `/patterns` | Saved patterns as cards with the stroke grid drawn out — the shape is what you recognise, not the name. |
 
-- **The deck** — the record's label shows the chord you are on, the tonearm
-  tracks your position in the loop.
-- **The lane** — the pattern as slots. Skipped slots still draw a faint
-  direction arrow, because the strumming hand never stops moving.
-- **The feedback** — while the mic is listening, a verdict on every strum:
-  a flashing pass/fail glyph and a meter holding your last 16 strums as a
-  scatter. Appears only when listening; the screen is otherwise unchanged.
-- **The transport** — play, tempo, what you hear, and the microphone.
-- **Settings** — the pattern builder, sound, listening and (optionally) account.
+### The practice screen
 
-Each slot also carries its own mark as it goes past: a coloured ring, a badge
+- **The chord**, set in inflated chrome, is the one large thing on screen.
+- **The lane** — the pattern as slots on a light ground. Skipped slots still
+  draw a faint direction arrow, because the strumming hand never stops moving,
+  and a lane showing only the strokes you play teaches the opposite.
+- **The feedback** — appears only while the mic is judging.
+- **The transport** — play, tempo, what you hear, the microphone, settings.
+
+Each slot carries its own mark as it goes past: a coloured ring, a badge
 (tight / close / loose / missed) and its timing error in milliseconds. A missed
-slot is desaturated and dashed, so "nothing heard there" reads differently from
-"played, but badly" — they are different mistakes with different fixes.
+slot is desaturated, so "nothing heard there" reads differently from "played,
+but badly" — different mistakes, different fixes.
+
+## The look
+
+Flat editorial: full-width blocks alternating black and lilac, inflated chrome
+lettering, flower confetti, tiny wide-tracked caps. There was a skeuomorphic
+hi-fi deck here — chrome bezels, glossy controls, a spinning record with a
+tonearm tracking the loop. It is gone. The tonearm and the lane's playhead were
+saying the same thing twice, and the gloss fought the type.
+
+Two things worth knowing before changing any of it:
+
+- **Components never name a colour.** They use semantic tokens — `--fg`,
+  `--accent`, `--tight`. Switching a block from dark to light is one class,
+  `.block-light`, which re-points those tokens so every child follows without
+  knowing it moved. Re-skinning the app is an edit to `globals.css` alone.
+- **The chrome lettering is two stacked copies** of the same text: a blurred
+  solid behind for the bloom, a gradient-clipped face on top. It has to be two
+  elements, because `background-clip: text` discards everything outside the
+  glyphs — the glow included. The gradient's hard mid-stops are what read as a
+  reflection; a smooth ramp between the same colours looks like plastic.
 
 ## How the timing works
 

@@ -84,7 +84,7 @@ export function SettingsPanel({
         role="dialog"
         aria-modal="true"
         aria-label="Settings"
-        className="relative flex h-full w-full max-w-lg flex-col border-l border-line bg-[color:var(--night)]/95 shadow-2xl"
+        className="relative flex h-full w-full max-w-lg flex-col border-l border-line bg-[color:var(--surface)]/95 shadow-2xl"
       >
         <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <h2 className="chrome-text font-display text-lg font-black uppercase tracking-[0.18em]">
@@ -114,7 +114,7 @@ export function SettingsPanel({
                     onClick={() => selectPattern(p.id)}
                     className="min-w-0 flex-1 text-left"
                   >
-                    <span className={`block truncate text-sm font-semibold ${p.id === state.activeId ? "text-cyan" : ""}`}>
+                    <span className={`block truncate text-sm font-semibold ${p.id === state.activeId ? "text-accent" : ""}`}>
                       {p.name}
                     </span>
                     <span className="block truncate font-lcd text-[10px] text-fg-dim">
@@ -196,13 +196,13 @@ export function SettingsPanel({
                     </p>
                     <p className="mt-1">
                       {sampleState === "loading" ? (
-                        <span className="text-amber">Downloading the recordings — about 2 MB, once.</span>
+                        <span className="text-close">Downloading the recordings — about 2 MB, once.</span>
                       ) : sampleState === "error" ? (
-                        <span className="text-rose">
+                        <span className="text-loose">
                           They failed to load, so you are hearing the synth instead.
                         </span>
                       ) : sampleState === "ready" ? (
-                        <span className="text-lime">Loaded.</span>
+                        <span className="text-tight">Loaded.</span>
                       ) : (
                         "Downloads the first time you press play."
                       )}
@@ -231,9 +231,9 @@ export function SettingsPanel({
                       className="h-2 w-2 rounded-full"
                       style={{
                         background:
-                          room.quality === "quiet" ? "var(--lime)"
-                            : room.quality === "usable" ? "var(--amber)"
-                            : "var(--rose)",
+                          room.quality === "quiet" ? "var(--tight)"
+                            : room.quality === "usable" ? "var(--close)"
+                            : "var(--loose)",
                       }}
                     />
                     <span className="text-sm font-semibold capitalize">{room.quality} room</span>

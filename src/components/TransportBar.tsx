@@ -81,8 +81,8 @@ export function TransportBar({
         <span
           className="h-2.5 w-2.5 shrink-0 rounded-full"
           style={{
-            background: micOn ? "var(--lime)" : micStatus === "error" ? "var(--rose)" : "rgba(255,255,255,.3)",
-            boxShadow: micOn ? "0 0 10px var(--lime)" : undefined,
+            background: micOn ? "var(--tight)" : micStatus === "error" ? "var(--loose)" : "rgba(255,255,255,.3)",
+            boxShadow: micOn ? "0 0 10px var(--tight)" : undefined,
           }}
         />
         <span className="truncate text-xs sm:text-sm">{micLabel}</span>
@@ -90,8 +90,11 @@ export function TransportBar({
 
       {micOn ? <LevelMeter db={level} /> : null}
 
-      <button type="button" onClick={onSettings} className="btn btn-icon ml-auto text-lg" aria-label="Settings">
-        ⚙
+      {/* A gear glyph renders as an illegible speck at this size and does not
+          match the editorial type elsewhere. The word is clearer and shorter
+          to parse than an icon nobody has to decode. */}
+      <button type="button" onClick={onSettings} className="btn caps ml-auto !px-4" aria-label="Settings">
+        Settings
       </button>
     </div>
   );
@@ -126,8 +129,8 @@ function LevelMeter({ db }: { db: number }) {
           width: `${pct * 100}%`,
           background:
             pct > 0.9
-              ? "linear-gradient(90deg,var(--lime),var(--rose))"
-              : "linear-gradient(90deg,var(--cyan),var(--lime))",
+              ? "linear-gradient(90deg,var(--tight),var(--loose))"
+              : "linear-gradient(90deg,var(--accent),var(--tight))",
         }}
       />
     </div>

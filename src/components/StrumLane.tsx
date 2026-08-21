@@ -42,7 +42,7 @@ export function StrumLane({
             <span className="font-display text-[10px] uppercase tracking-[0.2em] text-fg-dim">
               bar {bar + 1}
             </span>
-            <span className="font-display text-xs font-bold text-brass">{pattern.chords[bar]}</span>
+            <span className="font-display text-xs font-bold text-accent">{pattern.chords[bar]}</span>
           </div>
           <div
             className="grid gap-1"
@@ -86,11 +86,11 @@ export function StrumLane({
                     {/* Chord and stroke mistakes are marked separately from
                         timing, because they are a different thing to fix. */}
                     {verdict?.chordOk === false ? (
-                      <span className="verdict-flag" style={{ background: "var(--magenta)" }} title="Wrong chord">
+                      <span className="verdict-flag" style={{ background: "var(--extra)" }} title="Wrong chord">
                         {verdict.heardChord ?? "?"}
                       </span>
                     ) : verdict?.strokeOk === false ? (
-                      <span className="verdict-flag" style={{ background: "var(--violet)" }} title="Wrong direction">
+                      <span className="verdict-flag" style={{ background: "var(--accent-deep)" }} title="Wrong direction">
                         {verdict.slot >= 0 && stroke === "D" ? "↑" : "↓"}
                       </span>
                     ) : null}
@@ -98,7 +98,7 @@ export function StrumLane({
 
                   <div
                     className={`mt-1 text-center font-lcd text-[10px] leading-tight sm:text-xs ${
-                      active ? "text-cream" : "text-fg-dim"
+                      active ? "text-fg" : "text-fg-dim"
                     }`}
                   >
                     {verdict && verdict.grade !== "missed" ? (

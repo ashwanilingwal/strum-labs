@@ -31,7 +31,7 @@ export function ChordPicker({
           {preview ? <ChordDiagram chord={preview} size={110} /> : null}
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-display text-2xl font-black text-brass">{preview?.symbol}</div>
+          <div className="font-display text-2xl font-black text-accent">{preview?.symbol}</div>
           <div className="text-xs text-fg-muted">{preview?.name}</div>
           <p className="mt-1.5 text-xs leading-relaxed text-fg-dim">{preview?.tip}</p>
         </div>

@@ -1,11 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Orbitron, Chakra_Petch, Share_Tech_Mono } from "next/font/google";
-import { Backdrop } from "@/components/Backdrop";
+import { Bagel_Fat_One, Archivo, DM_Mono } from "next/font/google";
 import "./globals.css";
 
-const orbitron = Orbitron({ variable: "--font-orbitron", subsets: ["latin"], weight: ["500", "700", "900"] });
-const chakra = Chakra_Petch({ variable: "--font-chakra", subsets: ["latin"], weight: ["400", "500", "600", "700"] });
-const lcd = Share_Tech_Mono({ variable: "--font-lcd", subsets: ["latin"], weight: "400" });
+/**
+ * Bagel Fat One is the inflated display face the chrome treatment needs — the
+ * metal gradient only reads as metal on very fat, very round glyphs. Archivo
+ * carries everything else, and DM Mono the numerals, where tabular figures
+ * stop the tempo readout jittering as it counts.
+ */
+const bagel = Bagel_Fat_One({ variable: "--font-bagel", subsets: ["latin"], weight: "400" });
+const archivo = Archivo({ variable: "--font-archivo", subsets: ["latin"], weight: ["400", "500", "600", "700", "800"] });
+const mono = DM_Mono({ variable: "--font-mono-num", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
   title: "StrumLab",
@@ -13,19 +18,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#08040f",
-  // The app is a single fixed screen; letting it zoom on a double-tap only
-  // ever means accidentally zooming while tapping the transport.
+  themeColor: "#0b0a0c",
   maximumScale: 1,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${orbitron.variable} ${chakra.variable} ${lcd.variable} h-full antialiased`}>
-      <body className="min-h-full">
-        <Backdrop />
-        {children}
-      </body>
+    <html lang="en" className={`${bagel.variable} ${archivo.variable} ${mono.variable} h-full antialiased`}>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

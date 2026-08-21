@@ -22,19 +22,15 @@ export function Toggle({
       <span
         className="relative h-6 w-11 shrink-0 rounded-full border transition"
         style={{
-          borderColor: on ? "rgba(63,233,255,.7)" : "rgba(255,255,255,.2)",
-          background: on
-            ? "linear-gradient(180deg,#3fe9ff,#0d8ba8)"
-            : "linear-gradient(180deg,rgba(0,0,0,.5),rgba(0,0,0,.2))",
-          boxShadow: on ? "0 0 14px rgba(63,233,255,.45)" : "inset 0 2px 6px rgba(0,0,0,.6)",
+          borderColor: on ? "var(--accent)" : "var(--line)",
+          background: on ? "var(--accent)" : "transparent",
         }}
       >
         <span
           className="absolute top-0.5 h-5 w-5 rounded-full transition-all"
           style={{
             left: on ? "22px" : "2px",
-            background: "linear-gradient(180deg,#fff,#c2cede 55%,#7a8699)",
-            boxShadow: "0 2px 5px rgba(0,0,0,.7)",
+            background: on ? "var(--ink)" : "var(--fg-dim)",
           }}
         />
       </span>
@@ -94,8 +90,7 @@ export function SegmentedControl<T extends string>({
               style={
                 on
                   ? {
-                      background: "linear-gradient(180deg,rgba(255,255,255,.75),rgba(255,255,255,.12) 45%,rgba(0,0,0,.2)),linear-gradient(180deg,var(--cyan),var(--cyan-deep))",
-                      boxShadow: "0 1px 0 rgba(255,255,255,.5) inset, 0 4px 10px -4px rgba(0,0,0,.8)",
+                      background: "var(--lilac-200)",
                     }
                   : undefined
               }

@@ -60,7 +60,7 @@ export function PatternEditor({
             <input
               value={pattern.name}
               onChange={(e) => patch({ name: e.target.value })}
-              className="panel-sunken w-full px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-cyan"
+              className="panel-sunken w-full px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-accent"
               placeholder="Name this pattern"
             />
           </label>
@@ -104,7 +104,7 @@ export function PatternEditor({
                 <button
                   type="button"
                   onClick={() => setPickingBar(pickingBar === bar ? null : bar)}
-                  className="btn !py-1.5 font-display text-sm font-bold text-brass"
+                  className="btn !py-1.5 font-display text-sm font-bold text-accent"
                   aria-expanded={pickingBar === bar}
                 >
                   {pattern.chords[bar]} <span className="text-fg-dim">▾</span>
@@ -144,8 +144,8 @@ export function PatternEditor({
                         <span
                           className="h-1.5 w-1.5 rounded-full transition"
                           style={{
-                            background: accented ? "var(--cream)" : "rgba(255,255,255,.16)",
-                            boxShadow: accented ? "0 0 6px var(--cream)" : undefined,
+                            background: accented ? "var(--fg)" : "rgba(255,255,255,.16)",
+                            boxShadow: accented ? "0 0 6px var(--fg)" : undefined,
                           }}
                         />
                         <span className="font-lcd text-[10px] text-fg-dim">{labels[i]}</span>

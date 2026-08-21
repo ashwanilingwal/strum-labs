@@ -28,15 +28,19 @@ export function ChordDiagram({ chord, size = 132 }: { chord: Chord; size?: numbe
 
   return (
     <svg
-      width={size}
-      height={size}
+      // Sized by the parent, not by a pixel prop: at 375px a fixed 168px box
+      // swallows the screen. `size` still drives the viewBox, so the internal
+      // geometry maths is unchanged.
+      width="100%"
+      height="100%"
       viewBox={`0 0 ${size} ${size}`}
+      style={{ display: "block" }}
       role="img"
       aria-label={`${chord.name} chord diagram`}
     >
       {/* nut, or the fret-number label when the shape sits up the neck */}
       {offset === 0 ? (
-        <rect x={padX - 1} y={padTop - 5} width={w + 2} height={5} rx={1.5} fill="var(--cream)" />
+        <rect x={padX - 1} y={padTop - 5} width={w + 2} height={5} rx={1.5} fill="var(--fg)" />
       ) : (
         <text x={padX - 8} y={padTop + fretGap * 0.7} textAnchor="end" fontSize={size * 0.09} fill="var(--fg-dim)">
           {offset + 1}
@@ -50,7 +54,7 @@ export function ChordDiagram({ chord, size = 132 }: { chord: Chord; size?: numbe
           x2={padX + w}
           y1={padTop + f * fretGap}
           y2={padTop + f * fretGap}
-          stroke="rgba(180,166,214,.45)"
+          stroke="var(--fg-dim)"
           strokeWidth={1}
         />
       ))}
@@ -61,7 +65,7 @@ export function ChordDiagram({ chord, size = 132 }: { chord: Chord; size?: numbe
           x2={x(s)}
           y1={padTop}
           y2={padTop + h}
-          stroke="rgba(180,166,214,.55)"
+          stroke="var(--fg-dim)"
           strokeWidth={0.6 + (STRINGS - 1 - s) * 0.22}
         />
       ))}
@@ -69,7 +73,7 @@ export function ChordDiagram({ chord, size = 132 }: { chord: Chord; size?: numbe
       {/* open / muted markers above the nut */}
       {chord.frets.map((fret, s) =>
         fret === 0 ? (
-          <circle key={`o${s}`} cx={x(s)} cy={padTop - 13} r={3.6} fill="none" stroke="var(--cyan)" strokeWidth={1.6} />
+          <circle key={`o${s}`} cx={x(s)} cy={padTop - 13} r={3.6} fill="none" stroke="var(--accent)" strokeWidth={1.6} />
         ) : fret < 0 ? (
           <g key={`x${s}`} stroke="var(--fg-dim)" strokeWidth={1.6} strokeLinecap="round">
             <line x1={x(s) - 3.4} y1={padTop - 16.4} x2={x(s) + 3.4} y2={padTop - 9.6} />
@@ -85,7 +89,7 @@ export function ChordDiagram({ chord, size = 132 }: { chord: Chord; size?: numbe
           width={(chord.barre.to - chord.barre.from) * stringGap + stringGap * 0.68}
           height={fretGap * 0.6}
           rx={fretGap * 0.3}
-          fill="var(--cyan)"
+          fill="var(--accent)"
           opacity={0.92}
         />
       ) : null}
@@ -99,14 +103,14 @@ export function ChordDiagram({ chord, size = 132 }: { chord: Chord; size?: numbe
         if (isBarreDot) return null;
         return (
           <g key={`d${s}`}>
-            <circle cx={x(s)} cy={y(rel)} r={fretGap * 0.31} fill="var(--cyan)" />
+            <circle cx={x(s)} cy={y(rel)} r={fretGap * 0.31} fill="var(--accent)" />
             <text
               x={x(s)}
               y={y(rel) + fretGap * 0.11}
               textAnchor="middle"
               fontSize={fretGap * 0.4}
               fontWeight={700}
-              fill="var(--ink)"
+              fill="var(--surface-lift)"
             >
               {chord.fingers[s] || ""}
             </text>

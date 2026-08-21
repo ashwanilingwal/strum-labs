@@ -25,23 +25,23 @@ export interface GradeVisual {
 
 export const GRADE_VISUALS: Record<Grade, GradeVisual> = {
   tight: {
-    label: "Tight", glyph: "✓", color: "var(--lime)", className: "verdict-tight",
+    label: "Tight", glyph: "✓", color: "var(--tight)", className: "verdict-tight",
     coaching: "Right on the grid.",
   },
   close: {
-    label: "Close", glyph: "•", color: "var(--amber)", className: "verdict-close",
+    label: "Close", glyph: "•", color: "var(--close)", className: "verdict-close",
     coaching: "Nearly — keep the hand swinging evenly.",
   },
   loose: {
-    label: "Loose", glyph: "!", color: "var(--rose)", className: "verdict-loose",
+    label: "Loose", glyph: "!", color: "var(--loose)", className: "verdict-loose",
     coaching: "Well off the beat. Try it slower.",
   },
   missed: {
-    label: "Missed", glyph: "✕", color: "var(--violet)", className: "verdict-missed",
+    label: "Missed", glyph: "✕", color: "var(--accent-deep)", className: "verdict-missed",
     coaching: "Nothing heard there. Keep the hand moving through it.",
   },
   extra: {
-    label: "Extra", glyph: "+", color: "var(--magenta)", className: "verdict-extra",
+    label: "Extra", glyph: "+", color: "var(--extra)", className: "verdict-extra",
     coaching: "A strum the pattern didn't ask for.",
   },
 };
