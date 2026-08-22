@@ -55,6 +55,29 @@ export function StrumLab() {
     [pattern, setPattern],
   );
 
+  /**
+   * Step the tempo by a delta, resolved against the store at apply time.
+   *
+   * The -/+ buttons cannot do `setBpm(bpm + 1)`: `bpm` is a render-time value,
+   * so two clicks landing before React re-renders both read the same number and
+   * the second increment is silently lost. Anyone clicking + quickly gets fewer
+   * beats than they asked for.
+   */
+  const nudgeBpm = useCallback(
+    (delta: number) => {
+      setState((prev) => {
+        const current = activePattern(prev);
+        const next = Math.max(MIN_BPM, Math.min(MAX_BPM, current.bpm + delta));
+        if (next === current.bpm) return prev;
+        return {
+          ...prev,
+          patterns: prev.patterns.map((p) => (p.id === current.id ? { ...p, bpm: next } : p)),
+        };
+      });
+    },
+    [setState],
+  );
+
   const engine = useStrumEngine(pattern, state.audio, state.listen);
   const account = useAccount(state);
 
@@ -211,6 +234,7 @@ export function StrumLab() {
           onToggle={engine.toggle}
           bpm={pattern.bpm}
           onBpm={setBpm}
+          onNudgeBpm={nudgeBpm}
           click={state.audio.click}
           onClick={(v) => setState((s) => ({ ...s, audio: { ...s.audio, click: v } }))}
           guitar={state.audio.guitar}

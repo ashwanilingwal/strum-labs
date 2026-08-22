@@ -41,6 +41,9 @@ export interface HeardNote {
 
 const CALIBRATION_MS = 2200;
 
+/** How often the screen re-reads the audio clock. See the ui loop below. */
+const UI_TICK_MS = 25;
+
 export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: ListenSettings) {
   const engine = useMemo(() => getEngine(), []);
 
@@ -80,7 +83,6 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   const captureRef = useRef<MicCapture | null>(null);
   /** Slot changes queued against audio time, drained by the rAF loop. */
   const uiQueue = useRef<{ slot: number; time: number }[]>([]);
-  const rafRef = useRef(0);
 
   // ---- transport ---------------------------------------------------------
 
@@ -220,14 +222,25 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     else void start();
   }, [playing, start, stop]);
 
-  // ---- frame loop: screen catches up to the audio clock ------------------
+  // ---- ui loop: screen catches up to the audio clock ---------------------
 
+  /**
+   * Driven by a timer, deliberately not requestAnimationFrame.
+   *
+   * rAF does not fire at all while the page is hidden, backgrounded or
+   * throttled — and the transport keeps scheduling audio regardless, because
+   * it runs on the audio clock. The result is a frozen playhead over a running
+   * metronome, which reads as "the buttons do nothing".
+   *
+   * Nothing here is per-frame animation: it drains discrete slot events, sweeps
+   * missed notes and samples the input level. The fastest a slot can change is
+   * ~68ms (220bpm sixteenths), so a 25ms tick samples every slot two to three
+   * times over and costs far less than a frame callback would.
+   */
   useEffect(() => {
     if (!playing) return;
-    let alive = true;
 
-    const frame = () => {
-      if (!alive) return;
+    const tick = () => {
       const now = engine.currentTime;
 
       // Reveal slots at the moment they actually sound.
@@ -244,15 +257,11 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       scorerRef.current?.sweep(now);
       const d = detectorRef.current;
       if (d) setLevel(d.levelDb);
-
-      rafRef.current = requestAnimationFrame(frame);
     };
 
-    rafRef.current = requestAnimationFrame(frame);
-    return () => {
-      alive = false;
-      cancelAnimationFrame(rafRef.current);
-    };
+    tick();
+    const id = setInterval(tick, UI_TICK_MS);
+    return () => clearInterval(id);
   }, [playing, engine]);
 
   // ---- microphone --------------------------------------------------------

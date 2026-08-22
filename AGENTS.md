@@ -77,15 +77,23 @@ Break these and things fail in ways that are hard to trace back.
    are what makes "38 ms late" a true statement.
 6. **`slotsPerBar` is a field, not a constant.** The editor offers eighths, but
    4/12/16 already work end to end. Don't hardcode 8.
-7. **The play screen is an app shell, not a long page.** Fixed-height column:
+7. **Never drive the UI loop from requestAnimationFrame.** rAF does not fire
+   while the page is hidden, backgrounded or throttled, but the transport keeps
+   scheduling on the audio clock — so the playhead freezes over a running
+   metronome and the app looks dead. `useStrumEngine` uses a 25ms interval.
+   Nothing there is per-frame animation.
+8. **Stepper buttons resolve against the store, not a render-time value.**
+   `setBpm(bpm + 1)` loses increments when clicks land faster than React
+   re-renders. Use `nudgeBpm(delta)`.
+9. **The play screen is an app shell, not a long page.** Fixed-height column:
    nav, one scrolling region, transport in flow at the bottom. Do not make the
    transport sticky again — that needs a spacer matching its height, and
    measuring it depends on `resize` / `ResizeObserver`, which some embedded
    browser contexts never fire. The bug is silent: the spacer stays zero and
    the lane becomes unreachable.
-8. **Nothing is gated behind sign-in.** localStorage is the working copy;
+10. **Nothing is gated behind sign-in.** localStorage is the working copy;
    an account only adds sync.
-9. **Check 320px before calling a layout done.** It is where the transport
+11. **Check 320px before calling a layout done.** It is where the transport
    wraps to three rows and where wide letter-spacing stops fitting.
 8. **One voice per string.** Samples ring for up to 5 seconds; without the
    voice stealing in `sampler.ts` and `engine.ts`, a bar of eighths stacks ~48

@@ -6,14 +6,17 @@ import type { MicStatus } from "@/hooks/useStrumEngine";
 /** Play, tempo, what you hear, and the way into settings. */
 
 export function TransportBar({
-  playing, onToggle, bpm, onBpm,
+  playing, onToggle, bpm, onBpm, onNudgeBpm,
   click, onClick, guitar, onGuitar,
   micStatus, onMic, onSettings, level,
 }: {
   playing: boolean;
   onToggle: () => void;
   bpm: number;
+  /** Absolute set, for the slider. */
   onBpm: (v: number) => void;
+  /** Relative step, for the -/+ buttons. See the note in StrumLab. */
+  onNudgeBpm: (delta: number) => void;
   click: boolean;
   onClick: (v: boolean) => void;
   guitar: boolean;
@@ -51,7 +54,7 @@ export function TransportBar({
       </button>
 
       <div className="panel-sunken flex items-center gap-1 px-2 py-1.5">
-        <button type="button" className="btn btn-icon !h-8 !w-8 !p-0 text-base" aria-label="Slower" onClick={() => onBpm(bpm - 1)}>
+        <button type="button" className="btn btn-icon !h-8 !w-8 !p-0 text-base" aria-label="Slower" onClick={() => onNudgeBpm(-1)}>
           −
         </button>
         <div className="px-1 text-center">
@@ -60,7 +63,7 @@ export function TransportBar({
           </div>
           <div className="mt-0.5 font-display text-[9px] uppercase tracking-[0.2em] text-fg-dim">bpm</div>
         </div>
-        <button type="button" className="btn btn-icon !h-8 !w-8 !p-0 text-base" aria-label="Faster" onClick={() => onBpm(bpm + 1)}>
+        <button type="button" className="btn btn-icon !h-8 !w-8 !p-0 text-base" aria-label="Faster" onClick={() => onNudgeBpm(1)}>
           +
         </button>
       </div>
