@@ -44,6 +44,18 @@ average, because those diagnose different things: a player consistently 40 ms
 late has good time and a latency setting to fix, while a player scattered
 either side of the beat has a timing problem. "60% on time" hides which you are.
 
+### The chord chart
+
+`components/chart/ChordChart.tsx` draws a shape from data and takes an optional
+`ChartOverlay` for everything transient — which strings are sounding, which
+right-hand finger plucks which string, what is damped, per-string fret
+overrides. That split is the point: **a chord is a fact about the instrument, an
+overlay is a fact about the moment.** Fingerpicking, arpeggios, palm muting and
+riffs are all new overlay data rather than a new component.
+
+`ChordSequence` renders several at once — `symbols` for a compact strip showing
+where you are in a progression, `charts` for full boxes when learning one.
+
 ## The look
 
 Flat editorial: full-width blocks alternating black and brushed steel, liquid

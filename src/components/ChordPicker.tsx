@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { CHORDS, CHORD_TIERS, chordById, type ChordTier } from "@/lib/music/chords";
-import { ChordDiagram } from "./ChordDiagram";
+import { ChordChart } from "./chart/ChordChart";
 
 /**
  * Choosing the chord for a bar.
@@ -27,8 +27,8 @@ export function ChordPicker({
   return (
     <div className="panel p-3">
       <div className="mb-3 flex items-start gap-3">
-        <div className="panel-sunken shrink-0 p-1.5">
-          {preview ? <ChordDiagram chord={preview} size={110} /> : null}
+        <div className="panel-sunken w-24 shrink-0 p-1.5">
+          {preview ? <ChordChart chord={preview} /> : null}
         </div>
         <div className="min-w-0 flex-1">
           <div className="font-display text-2xl font-black text-accent">{preview?.symbol}</div>

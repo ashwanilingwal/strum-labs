@@ -65,7 +65,7 @@ export function StrumLane({
                 <div key={index} className="min-w-0">
                   <div
                     className={[
-                      "slot relative flex h-11 items-center justify-center sm:h-14",
+                      "slot relative flex h-14 items-center justify-center sm:h-16",
                       SLOT_CLASS[stroke],
                       pattern.accents.includes(index) ? "slot-accent" : "",
                       active ? "slot-active" : "",
@@ -73,7 +73,7 @@ export function StrumLane({
                     ].join(" ")}
                   >
                     <span
-                      className={`text-lg font-bold sm:text-2xl ${stroke === "-" ? "text-fg-dim opacity-45" : ""}`}
+                      className={`text-2xl font-bold sm:text-3xl ${stroke === "-" ? "text-fg-dim opacity-45" : ""}`}
                     >
                       {stroke === "-" ? (dir === "down" ? "↓" : "↑") : GLYPH[stroke]}
                     </span>
@@ -103,7 +103,7 @@ export function StrumLane({
                   </div>
 
                   <div
-                    className={`mt-1 text-center font-lcd text-[10px] leading-tight sm:text-xs ${
+                    className={`mt-1.5 text-center font-lcd text-xs leading-tight ${
                       active ? "text-fg" : "text-fg-dim"
                     }`}
                   >

@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import { getEngine } from "@/lib/audio/engine";
 import { CHORDS, CHORD_TIERS, chordMidiNotes, type ChordTier } from "@/lib/music/chords";
 import { appStore } from "@/lib/storage/settings";
-import { ChordDiagram } from "./ChordDiagram";
+import { ChordChart } from "./chart/ChordChart";
 import { ChromeText } from "./ui/ChromeText";
 import { MotifField } from "./ui/MotifField";
 import { Nav } from "./ui/Nav";
@@ -83,8 +83,8 @@ export function ChordLibrary() {
               }}
               aria-label={`Hear ${chord.name}`}
             >
-              <div className="shrink-0">
-                <ChordDiagram chord={chord} size={104} />
+              <div className="w-24 shrink-0 sm:w-26">
+                <ChordChart chord={chord} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-display text-2xl leading-none text-chrome-700">{chord.symbol}</div>

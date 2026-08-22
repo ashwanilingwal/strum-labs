@@ -8,7 +8,8 @@ import {
 import { activePattern, appStore, type AppState } from "@/lib/storage/settings";
 import { touchLocal, useAccount } from "@/hooks/useAccount";
 import { useStrumEngine } from "@/hooks/useStrumEngine";
-import { ChordDiagram } from "./ChordDiagram";
+import { ChordChart } from "./chart/ChordChart";
+import { ChordSequence } from "./chart/ChordSequence";
 import { LiveFeedback } from "./LiveFeedback";
 import { SessionSummary } from "./SessionSummary";
 import { SettingsPanel } from "./SettingsPanel";
@@ -107,7 +108,6 @@ export function StrumLab() {
 
   const bar = engine.activeSlot >= 0 ? barOfSlot(pattern, engine.activeSlot) : 0;
   const chord = chordById(pattern.chords[bar]);
-  const nextChord = chordById(pattern.chords[(bar + 1) % pattern.bars]);
   const showVerdicts = engine.micStatus === "listening";
 
   const lastWantChord =
@@ -143,6 +143,17 @@ export function StrumLab() {
         <Nav />
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
+        {/*
+          Auto margins rather than `justify-center` on the scroller: they centre
+          the group but still let it scroll when it outgrows the box, where
+          justify-center makes the overflowing top unreachable.
+
+          Bottom-anchored on a phone, centred from `sm` up. On a small screen the
+          lane is what you watch while playing, so the slack belongs above the
+          chord — not between the lane and the transport, where it pushed the two
+          things you actually use apart.
+        */}
+        <div className="mt-auto w-full sm:my-auto">
 
       {/* Chord — the one big thing on the screen. */}
       {/*
@@ -150,9 +161,9 @@ export function StrumLab() {
         On a phone that is the only way both fit above the fold; on a desktop
         centring them stops the pair drifting to one edge of a wide screen.
       */}
-      <section className="relative flex flex-1 shrink-0 flex-col justify-center px-4 py-8 sm:px-8">
+      <section className="relative px-4 py-5 sm:px-8 sm:py-8">
         <MotifField density={0.5} />
-        <div className="wrap relative z-10 flex w-full flex-col items-center gap-5">
+        <div className="wrap relative z-10 flex w-full flex-col items-center gap-4">
           <div className="flex w-full items-center justify-center gap-4 sm:gap-10">
             <div className="min-w-0 text-center">
               <p className="caps text-fg-dim">
@@ -162,34 +173,41 @@ export function StrumLab() {
                     ? `Bar ${bar + 1} of ${pattern.bars}`
                     : "Ready"}
               </p>
-              <ChromeText className="mt-1 block text-[clamp(3.25rem,13vw,10rem)]">
+              <ChromeText className="mt-1 block text-[clamp(4.25rem,13vw,8rem)]">
                 {engine.countIn > 0 ? String(engine.countIn) : (chord?.symbol ?? "\u2014")}
               </ChromeText>
-              <p className="caps-lg mt-2 text-fg">
+              <p className="caps-lg mt-1.5 text-fg">
                 {engine.countIn > 0 ? "Get ready" : chord?.name}
               </p>
-              {nextChord && nextChord.id !== chord?.id && engine.countIn === 0 ? (
-                <p className="caps mt-1 text-fg-dim">
-                  next <span className="text-accent">{nextChord.symbol}</span>
-                </p>
-              ) : null}
             </div>
 
             {chord ? (
-              <div className="block-light card-flat w-28 shrink-0 p-3 sm:w-40 sm:p-4 lg:w-44">
-                <ChordDiagram chord={chord} size={168} />
+              <div className="block-light card-flat w-32 shrink-0 p-3 sm:w-36 sm:p-4 lg:w-40">
+                <ChordChart chord={chord} />
               </div>
             ) : null}
           </div>
 
+          {/* Where you are in the progression. Replaces the old "next X" line —
+              same space, but it shows the whole shape of the pattern. */}
+          {pattern.bars > 1 ? (
+            <ChordSequence chords={pattern.chords} activeIndex={engine.playing ? bar : -1} />
+          ) : null}
+
           {chord && engine.countIn === 0 ? (
-            <p className="max-w-xl text-center text-sm leading-relaxed text-fg-muted">{chord.tip}</p>
+            <p
+              className={`max-w-xl text-center text-sm leading-relaxed text-fg-muted ${
+                engine.playing ? "hidden sm:block" : ""
+              }`}
+            >
+              {chord.tip}
+            </p>
           ) : null}
         </div>
       </section>
 
       {/* The pattern. Light ground so it reads as a separate object. */}
-      <section className="block-light px-4 py-6 sm:px-8">
+      <section className="block-light px-4 py-5 sm:px-8 sm:py-6">
         <div className="wrap">
         <div className="mb-3 flex items-baseline justify-between gap-4">
           <span className="caps text-fg-dim">{pattern.name}</span>
@@ -238,6 +256,7 @@ export function StrumLab() {
         </div>
       ) : null}
 
+        </div>
       </div>
 
       <div className="shrink-0 border-t border-line bg-ink/95 px-4 py-3 sm:px-8">
