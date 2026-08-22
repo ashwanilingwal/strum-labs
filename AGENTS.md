@@ -43,7 +43,8 @@ Find your row, open that file, stop. None of these require reading the rest.
 | Spectral **maths** | `lib/listen/dsp.ts`, `lib/listen/fft.ts` | Pure, no Web Audio, directly testable. |
 | **Mic setup** / permissions | `lib/listen/mic.ts` | Includes the AudioWorklet source. |
 | How a strum is **judged** | `lib/listen/scoring.ts` | `TIGHT_MS`, `CLOSE_MS`, latency offset, missed/extra, bleed rejection. |
-| How a verdict **looks or reads** | `lib/feedback/presentation.ts` | Colours, glyphs, wording, meter geometry. No component hardcodes these. |
+| How a verdict **looks or reads** | `lib/feedback/presentation.ts` | Colours, glyphs, wording, meter geometry. No component hardcodes these. Use `verdictVisual(grade, errorMs)` — it knows rushing from dragging; `gradeVisual(grade)` is for aggregates only. |
+| The **stop summary** | `components/SessionSummary.tsx` | Headline logic is in `verdictLine`. |
 | **Colours, type, every surface** | `:root` and `.block-light` in `globals.css` | Components name only semantic tokens (`--fg`, `--accent`, `--tight`). Re-skinning is this file alone. |
 | Dark vs light **ground** | add `.block-light` / `.block-dark` | Re-points the contextual tokens; children follow without knowing they moved. |
 | The **chrome lettering** | `.chrome-face` gradient in `globals.css`, `components/ui/ChromeText.tsx` | The hard mid-stops are what read as metal — a smooth ramp looks like plastic. |

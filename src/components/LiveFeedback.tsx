@@ -3,7 +3,7 @@
 import type { SlotVerdict } from "@/lib/listen/scoring";
 import type { RecentHit } from "@/hooks/useStrumEngine";
 import {
-  gradeVisual, METER_BANDS, meterPosition, verdictHeadline,
+  gradeVisual, METER_BANDS, meterPosition, verdictHeadline, verdictVisual,
 } from "@/lib/feedback/presentation";
 
 /**
@@ -32,7 +32,7 @@ export function LiveFeedback({
   meanErrorMs: number;
   hits: number;
 }) {
-  const visual = lastVerdict ? gradeVisual(lastVerdict.grade) : null;
+  const visual = lastVerdict ? verdictVisual(lastVerdict.grade, lastVerdict.errorMs) : null;
   const hasNeedle =
     lastVerdict !== null && lastVerdict.grade !== "missed" && lastVerdict.grade !== "extra";
 
@@ -122,9 +122,9 @@ export function LiveFeedback({
           </div>
 
           <div className="mt-1 flex justify-between font-lcd text-[9px] uppercase tracking-widest text-fg-dim">
-            <span>early</span>
+            <span>rushing</span>
             <span>{hits >= 4 ? `avg ${meanErrorMs > 0 ? "+" : ""}${meanErrorMs.toFixed(0)} ms` : "on the beat"}</span>
-            <span>late</span>
+            <span>dragging</span>
           </div>
         </div>
       </div>

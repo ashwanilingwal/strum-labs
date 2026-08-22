@@ -23,21 +23,25 @@ export interface GradeVisual {
   coaching: string;
 }
 
+/**
+ * Base labels, used where no single timing error applies — aggregate stats and
+ * legends. Per-strum feedback uses `verdictVisual`, which knows the direction.
+ */
 export const GRADE_VISUALS: Record<Grade, GradeVisual> = {
   tight: {
-    label: "Tight", glyph: "✓", color: "var(--tight)", className: "verdict-tight",
-    coaching: "Right on the grid.",
+    label: "On time", glyph: "\u2713", color: "var(--tight)", className: "verdict-tight",
+    coaching: "Right on the beat.",
   },
   close: {
-    label: "Close", glyph: "•", color: "var(--close)", className: "verdict-close",
-    coaching: "Nearly — keep the hand swinging evenly.",
+    label: "Nearly", glyph: "\u2022", color: "var(--close)", className: "verdict-close",
+    coaching: "Close. Keep the strumming hand swinging evenly.",
   },
   loose: {
-    label: "Loose", glyph: "!", color: "var(--loose)", className: "verdict-loose",
+    label: "Out", glyph: "!", color: "var(--loose)", className: "verdict-loose",
     coaching: "Well off the beat. Try it slower.",
   },
   missed: {
-    label: "Missed", glyph: "✕", color: "var(--accent-deep)", className: "verdict-missed",
+    label: "Missed", glyph: "\u2715", color: "var(--fg-dim)", className: "verdict-missed",
     coaching: "Nothing heard there. Keep the hand moving through it.",
   },
   extra: {
@@ -46,14 +50,39 @@ export const GRADE_VISUALS: Record<Grade, GradeVisual> = {
   },
 };
 
+/**
+ * Per-strum feedback, worded the way a teacher would.
+ *
+ * "Rushing" and "dragging" are the real terms for playing ahead of and behind
+ * the beat, and unlike "tight" or "loose" they say which way to correct. The
+ * grade alone cannot express that — direction lives in the sign of the error —
+ * so the label is derived from both.
+ */
+export function verdictVisual(grade: Grade, errorMs: number): GradeVisual {
+  const base = GRADE_VISUALS[grade];
+  if (grade !== "close" && grade !== "loose") return base;
+
+  const early = errorMs < 0;
+  return {
+    ...base,
+    glyph: early ? "\u00ab" : "\u00bb",
+    label: grade === "close"
+      ? (early ? "Rushing" : "Dragging")
+      : (early ? "Way early" : "Way late"),
+    coaching: early
+      ? "You're ahead of the beat — let the click lead, don't chase it."
+      : "You're behind the beat — start the stroke a fraction earlier.",
+  };
+}
+
 export function gradeVisual(grade: Grade): GradeVisual {
   return GRADE_VISUALS[grade];
 }
 
-/** "12 ms early" / "on it" / "40 ms late". */
+/** "12 ms early" / "bang on" / "40 ms late". */
 export function timingPhrase(errorMs: number): string {
   const rounded = Math.round(errorMs);
-  if (Math.abs(rounded) <= 8) return "on it";
+  if (Math.abs(rounded) <= 8) return "bang on";
   return `${Math.abs(rounded)} ms ${rounded < 0 ? "early" : "late"}`;
 }
 
@@ -83,8 +112,8 @@ export const METER_BANDS = {
  * are worth more than a timing number when they happen, so they win.
  */
 export function verdictHeadline(v: SlotVerdict, wantChord: string | null): string {
-  if (v.grade === "extra") return "Extra strum";
-  if (v.grade === "missed") return "Nothing heard";
+  if (v.grade === "extra") return "A strum the pattern didn't ask for";
+  if (v.grade === "missed") return "Nothing heard there";
   if (v.chordOk === false && v.heardChord && wantChord) return `Heard ${v.heardChord}, wanted ${wantChord}`;
   if (v.strokeOk === false) return "Wrong way — check up vs down";
   return timingPhrase(v.errorMs);

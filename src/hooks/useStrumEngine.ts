@@ -64,6 +64,11 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   const [verdictSeq, setVerdictSeq] = useState(0);
   const [recent, setRecent] = useState<RecentHit[]>([]);
   const [stats, setStats] = useState<SessionStats>(emptyStats());
+  /** Snapshot taken on stop, so the summary survives the reset. */
+  const [summary, setSummary] = useState<SessionStats | null>(null);
+  // stop() is a stable callback and cannot read `stats` from its closure, so
+  // the latest value is mirrored here.
+  const statsRef = useRef<SessionStats>(emptyStats());
   const [heard, setHeard] = useState<HeardNote | null>(null);
 
   // Live copies for the scheduling callbacks, which must not be rebuilt on
@@ -179,6 +184,10 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     setPlaying(false);
     setActiveSlot(-1);
     setCountIn(0);
+    // Only worth a summary if the microphone actually judged something.
+    if (statsRef.current.hits + statsRef.current.missed > 0) {
+      setSummary({ ...statsRef.current });
+    }
   }, [engine]);
 
   const start = useCallback(async () => {
@@ -198,6 +207,8 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     setVerdicts({});
     setLastVerdict(null);
     setRecent([]);
+    setSummary(null);
+    statsRef.current = emptyStats();
     setStats(emptyStats());
 
     const transport = ensureTransport();
@@ -268,6 +279,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
   const handleVerdict = useCallback((v: SlotVerdict, s: SessionStats) => {
     if (v.slot >= 0) setVerdicts((prev) => ({ ...prev, [v.slot]: v }));
+    statsRef.current = s;
     setStats(s);
     setLastVerdict(v);
     // A monotonic counter drives the flash, not the verdict object: two
@@ -375,6 +387,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     micStatus, micMessage, room, level, listening, sampleState,
     startListening, stopListening, recalibrate, absorbBias,
     verdicts, lastVerdict, verdictSeq, recent, stats, heard,
+    summary, dismissSummary: () => setSummary(null),
     beats: beatSlots(pattern),
   };
 }

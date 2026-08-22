@@ -10,6 +10,7 @@ import { touchLocal, useAccount } from "@/hooks/useAccount";
 import { useStrumEngine } from "@/hooks/useStrumEngine";
 import { ChordDiagram } from "./ChordDiagram";
 import { LiveFeedback } from "./LiveFeedback";
+import { SessionSummary } from "./SessionSummary";
 import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
 import { TransportBar } from "./TransportBar";
@@ -144,34 +145,46 @@ export function StrumLab() {
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
 
       {/* Chord — the one big thing on the screen. */}
+      {/*
+        Chord and diagram sit side by side at every width, as one centred group.
+        On a phone that is the only way both fit above the fold; on a desktop
+        centring them stops the pair drifting to one edge of a wide screen.
+      */}
       <section className="relative flex flex-1 shrink-0 flex-col justify-center px-4 py-8 sm:px-8">
         <MotifField density={0.5} />
-        <div className="wrap flex w-full flex-col gap-6 lg:flex-row lg:items-center lg:gap-12">
-        <div className="relative z-10 min-w-0 flex-1">
-          <p className="caps text-fg-dim">
-            {engine.countIn > 0 ? "Count in" : engine.playing ? `Bar ${bar + 1} of ${pattern.bars}` : "Ready"}
-          </p>
-          <ChromeText className="mt-2 text-[clamp(5rem,19vw,18rem)]">
-            {engine.countIn > 0 ? String(engine.countIn) : (chord?.symbol ?? "—")}
-          </ChromeText>
-          <div className="mt-4 flex flex-wrap items-baseline gap-x-5 gap-y-1">
-            <span className="caps-lg text-fg">{engine.countIn > 0 ? "Get ready" : chord?.name}</span>
-            {nextChord && nextChord.id !== chord?.id && engine.countIn === 0 ? (
-              <span className="caps text-fg-dim">
-                next <span className="text-accent">{nextChord.symbol}</span>
-              </span>
+        <div className="wrap relative z-10 flex w-full flex-col items-center gap-5">
+          <div className="flex w-full items-center justify-center gap-4 sm:gap-10">
+            <div className="min-w-0 text-center">
+              <p className="caps text-fg-dim">
+                {engine.countIn > 0
+                  ? "Count in"
+                  : engine.playing
+                    ? `Bar ${bar + 1} of ${pattern.bars}`
+                    : "Ready"}
+              </p>
+              <ChromeText className="mt-1 block text-[clamp(3.25rem,13vw,10rem)]">
+                {engine.countIn > 0 ? String(engine.countIn) : (chord?.symbol ?? "\u2014")}
+              </ChromeText>
+              <p className="caps-lg mt-2 text-fg">
+                {engine.countIn > 0 ? "Get ready" : chord?.name}
+              </p>
+              {nextChord && nextChord.id !== chord?.id && engine.countIn === 0 ? (
+                <p className="caps mt-1 text-fg-dim">
+                  next <span className="text-accent">{nextChord.symbol}</span>
+                </p>
+              ) : null}
+            </div>
+
+            {chord ? (
+              <div className="block-light card-flat w-28 shrink-0 p-3 sm:w-40 sm:p-4 lg:w-44">
+                <ChordDiagram chord={chord} size={168} />
+              </div>
             ) : null}
           </div>
-          {chord && engine.countIn === 0 ? (
-            <p className="mt-3 max-w-md text-sm leading-relaxed text-fg-muted">{chord.tip}</p>
-          ) : null}
-        </div>
 
-        {chord ? (
-          <div className="block-light card-flat relative z-10 w-32 shrink-0 self-start p-3 sm:w-44 sm:p-4 lg:self-center">
-            <ChordDiagram chord={chord} size={168} />
-          </div>
-        ) : null}
+          {chord && engine.countIn === 0 ? (
+            <p className="max-w-xl text-center text-sm leading-relaxed text-fg-muted">{chord.tip}</p>
+          ) : null}
         </div>
       </section>
 
@@ -247,6 +260,19 @@ export function StrumLab() {
         </div>
       </div>
 
+      {engine.summary ? (
+        <SessionSummary
+          stats={engine.summary}
+          checkChord={state.listen.checkChord}
+          checkStroke={state.listen.checkStroke}
+          onDismiss={engine.dismissSummary}
+          onAgain={() => {
+            engine.dismissSummary();
+            void engine.start();
+          }}
+        />
+      ) : null}
+
       <SettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -289,11 +315,11 @@ function ScoreStrip({
   const pct = (n: number, d: number) => (d ? `${Math.round((n / d) * 100)}%` : "—");
   return (
     <div className="mt-2 flex flex-wrap gap-x-8 gap-y-2">
-      <Stat label="Tight" value={pct(stats.tight, attempted)} />
+      <Stat label="On time" value={pct(stats.tight, attempted)} />
       <Stat label="Missed" value={String(stats.missed)} />
       <Stat label="Extra" value={String(stats.extra)} />
       {checkChord ? <Stat label="Chord" value={pct(stats.chordRight, stats.chordChecked)} /> : null}
-      {checkStroke ? <Stat label="Up / down" value={pct(stats.strokeRight, stats.strokeChecked)} /> : null}
+      {checkStroke ? <Stat label="Direction" value={pct(stats.strokeRight, stats.strokeChecked)} /> : null}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import {
   countLabels, handDirection, type Pattern, type Stroke,
 } from "@/lib/music/pattern";
 import type { SlotVerdict } from "@/lib/listen/scoring";
-import { gradeVisual, signedMs } from "@/lib/feedback/presentation";
+import { signedMs, verdictVisual } from "@/lib/feedback/presentation";
 
 /**
  * The pattern as a lane of slots, with the playhead and — when the mic is on —
@@ -59,7 +59,7 @@ export function StrumLane({
               const stroke = pattern.strokes[index];
               const active = index === activeSlot;
               const verdict = showVerdicts ? verdicts[index] : undefined;
-              const visual = verdict ? gradeVisual(verdict.grade) : null;
+              const visual = verdict ? verdictVisual(verdict.grade, verdict.errorMs) : null;
               const dir = handDirection(pattern.slotsPerBar, pattern.beatsPerBar, index);
               return (
                 <div key={index} className="min-w-0">

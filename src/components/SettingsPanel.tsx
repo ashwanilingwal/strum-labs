@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { emptyPattern, newPatternId, PRESETS, type Pattern } from "@/lib/music/pattern";
 import type { AppState } from "@/lib/storage/settings";
 import type { MicStatus } from "@/hooks/useStrumEngine";
@@ -44,6 +44,8 @@ export function SettingsPanel({
   };
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -96,56 +98,110 @@ export function SettingsPanel({
         </header>
 
         <div className="flex-1 space-y-6 overflow-y-auto p-4">
+          {/*
+            Collapsed by default and showing only the pattern in play. The full
+            list was the first thing in the sheet and pushed the editor — the
+            thing you actually came here for — below the fold. Switching pattern
+            is occasional; editing one is constant.
+          */}
           <section>
-            <SectionTitle
-              right={
-                <button type="button" className="btn !px-2.5 !py-1 text-[11px]" onClick={() => addPattern(emptyPattern())}>
-                  + New
-                </button>
-              }
-            >
-              Your patterns
-            </SectionTitle>
-            <div className="panel divide-y divide-[color:var(--line-soft)] p-1">
-              {state.patterns.map((p) => (
-                <div key={p.id} className="flex items-center gap-2 px-2 py-1.5">
+            <SectionTitle>Pattern in play</SectionTitle>
+            <div className="panel p-1">
+              <button
+                type="button"
+                onClick={() => setPickerOpen((v) => !v)}
+                aria-expanded={pickerOpen}
+                className="flex w-full items-center gap-2 px-2 py-2 text-left"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-accent">{pattern.name}</span>
+                  <span className="block truncate font-lcd text-[10px] text-fg-dim">
+                    {pattern.bars} bar{pattern.bars > 1 ? "s" : ""} · {pattern.chords.join(" ")} · {pattern.bpm} bpm
+                  </span>
+                </span>
+                <span className="caps shrink-0 text-fg-dim">
+                  {pickerOpen ? "Close" : "Change"}
+                </span>
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-fg-dim transition-transform"
+                  style={{ transform: pickerOpen ? "rotate(180deg)" : "none" }}
+                >
+                  ▾
+                </span>
+              </button>
+
+              {pickerOpen ? (
+                <div className="border-t border-line px-1 pb-1 pt-1">
+                  {state.patterns.map((p) => {
+                    const active = p.id === state.activeId;
+                    return (
+                      <div key={p.id} className="flex items-center gap-2 px-1 py-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            selectPattern(p.id);
+                            setPickerOpen(false);
+                          }}
+                          className="min-w-0 flex-1 text-left"
+                        >
+                          <span className={`block truncate text-sm font-semibold ${active ? "text-accent" : ""}`}>
+                            {active ? "\u2713 " : ""}{p.name}
+                          </span>
+                          <span className="block truncate font-lcd text-[10px] text-fg-dim">
+                            {p.bars} bar{p.bars > 1 ? "s" : ""} · {p.chords.join(" ")} · {p.bpm} bpm
+                          </span>
+                        </button>
+                        <button type="button" className="btn !px-2 !py-1 text-[11px]" onClick={() => addPattern(p)}>
+                          Copy
+                        </button>
+                        <button
+                          type="button"
+                          className="btn !px-2 !py-1 text-[11px]"
+                          onClick={() => deletePattern(p.id)}
+                          disabled={state.patterns.length <= 1}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    );
+                  })}
+
+                  <div className="mt-1 border-t border-line pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setPresetsOpen((v) => !v)}
+                      aria-expanded={presetsOpen}
+                      className="caps flex w-full items-center justify-between px-1 py-1 text-fg-dim"
+                    >
+                      Start from a preset
+                      <span aria-hidden="true">{presetsOpen ? "\u2212" : "+"}</span>
+                    </button>
+                    {presetsOpen ? (
+                      <div className="flex flex-wrap gap-1.5 px-1 pb-1 pt-1">
+                        {PRESETS.map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            className="btn !px-2.5 !py-1 text-[11px]"
+                            onClick={() => addPattern(p)}
+                          >
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
                   <button
                     type="button"
-                    onClick={() => selectPattern(p.id)}
-                    className="min-w-0 flex-1 text-left"
+                    className="btn btn-lit mt-2 w-full !py-1.5 text-[11px]"
+                    onClick={() => addPattern(emptyPattern())}
                   >
-                    <span className={`block truncate text-sm font-semibold ${p.id === state.activeId ? "text-accent" : ""}`}>
-                      {p.name}
-                    </span>
-                    <span className="block truncate font-lcd text-[10px] text-fg-dim">
-                      {p.bars} bar{p.bars > 1 ? "s" : ""} · {p.chords.join(" ")} · {p.bpm} bpm
-                    </span>
-                  </button>
-                  <button type="button" className="btn !px-2 !py-1 text-[11px]" onClick={() => addPattern(p)}>
-                    Copy
-                  </button>
-                  <button
-                    type="button"
-                    className="btn !px-2 !py-1 text-[11px]"
-                    onClick={() => deletePattern(p.id)}
-                    disabled={state.patterns.length <= 1}
-                  >
-                    Delete
+                    + New empty pattern
                   </button>
                 </div>
-              ))}
-            </div>
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {PRESETS.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  className="btn !px-2.5 !py-1 text-[11px]"
-                  onClick={() => addPattern(p)}
-                >
-                  {p.name}
-                </button>
-              ))}
+              ) : null}
             </div>
           </section>
 

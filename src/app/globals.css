@@ -177,11 +177,32 @@ body {
     drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5));
 }
 
-.block-light .chrome-glow { opacity: 0.45; }
+/* On a light ground the polished gradient is unreadable: its brightest bands
+   are white, and white on white is nothing. This is the same metal lit from
+   the other side — dark body, light highlights — so it keeps the chrome
+   banding while staying legible. */
+.block-light .chrome-glow {
+  opacity: 0.3;
+  color: var(--chrome-400);
+}
+
 .block-light .chrome-face {
+  background-image: linear-gradient(
+    178deg,
+    #46586b 0%,
+    #94a8bc 12%,
+    #33404e 26%,
+    #7288a0 40%,
+    #161d25 50%,
+    #4d6076 58%,
+    #a8bccf 70%,
+    #2b3542 84%,
+    #63788e 94%,
+    #1d252f 100%
+  );
   filter:
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.8))
-    drop-shadow(0 10px 20px rgba(40, 50, 62, 0.32));
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.75))
+    drop-shadow(0 8px 16px rgba(40, 50, 62, 0.28));
 }
 
 /* --- type ----------------------------------------------------------------- */

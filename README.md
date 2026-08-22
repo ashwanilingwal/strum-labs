@@ -28,10 +28,21 @@ npm run dev
 - **The feedback** — appears only while the mic is judging.
 - **The transport** — play, tempo, what you hear, the microphone, settings.
 
-Each slot carries its own mark as it goes past: a coloured ring, a badge
-(tight / close / loose / missed) and its timing error in milliseconds. A missed
-slot is desaturated, so "nothing heard there" reads differently from "played,
-but badly" — different mistakes, different fixes.
+Each slot carries its own mark as it goes past: a coloured ring, a badge and
+its timing error in milliseconds. A missed slot is desaturated, so "nothing
+heard there" reads differently from "played, but badly" — different mistakes,
+different fixes.
+
+Feedback is worded the way a teacher words it. **Rushing** is ahead of the beat,
+**dragging** is behind it; the badge shows `«` or `»` accordingly. Those are the
+real terms, and unlike "tight" or "loose" they tell you which way to correct.
+The grade alone cannot say that — direction lives in the sign of the error — so
+every label is derived from both.
+
+Stopping brings up a summary. Its headline is about the **spread**, not the
+average, because those diagnose different things: a player consistently 40 ms
+late has good time and a latency setting to fix, while a player scattered
+either side of the beat has a timing problem. "60% on time" hides which you are.
 
 ## The look
 
