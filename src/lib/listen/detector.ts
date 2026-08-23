@@ -74,6 +74,27 @@ const TEMPLATES: { chord: Chord; template: Float32Array }[] = CHORDS.map((chord)
   template: chordTemplate(chord),
 }));
 
+/**
+ * How hard to punish template mass the signal does not support.
+ *
+ * Cosine similarity alone cannot separate a chord from its own superset:
+ * Cmaj7 contains every note of C plus one, so a plain C scores against Cmaj7
+ * almost as well as against itself — measured at 0.96 vs 0.95, which no
+ * confidence threshold can use. Subtracting the template energy that has no
+ * counterpart in the chroma targets exactly that asymmetry.
+ *
+ * Swept over synthetic chords: 0 gives 59% correct, 0.15 and 0.3 give 69%,
+ * 0.5 gives 72%, 0.8 drops back to 69%.
+ */
+const UNSUPPORTED_PENALTY = 0.5;
+
+/** Similarity, less whatever the template expects and the signal lacks. */
+function matchScore(observed: Float32Array, template: Float32Array): number {
+  let unsupported = 0;
+  for (let i = 0; i < 12; i++) unsupported += Math.max(0, template[i] - observed[i]);
+  return cosineSimilarity(observed, template) - UNSUPPORTED_PENALTY * unsupported;
+}
+
 export class OnsetDetector {
   private fft = new FFT(FFT_SIZE);
   private window = hannWindow(FFT_SIZE);
@@ -85,6 +106,14 @@ export class OnsetDetector {
 
   private mag = new Float32Array(FFT_SIZE / 2);
   private prevMag = new Float32Array(FFT_SIZE / 2);
+  /**
+   * Flux is a difference against the previous spectrum, and `prevMag` starts
+   * empty — so the first analysed window measures itself against silence and
+   * reports the entire spectrum as a rise. That is a phantom strum at the exact
+   * moment listening begins, and worse, its refractory period then swallows the
+   * first real one. The first window only primes the comparison.
+   */
+  private primed = false;
   private scratch = new Float32Array(FFT_SIZE);
   private frames: Frame[] = [];
   private fluxHistory: number[] = [];
@@ -159,6 +188,7 @@ export class OnsetDetector {
     this.fluxHistory = [];
     this.lastOnsetTime = -1;
     this.prevMag.fill(0);
+    this.primed = false;
   }
 
   /** Feed one block from the mic. Blocks need not be hop-aligned. */
@@ -198,6 +228,12 @@ export class OnsetDetector {
 
     for (let i = 0; i < FFT_SIZE; i++) this.scratch[i] = this.ring[i] * this.window[i];
     this.fft.magnitudes(this.scratch, this.mag);
+
+    if (!this.primed) {
+      this.prevMag.set(this.mag);
+      this.primed = true;
+      return;
+    }
 
     const flux = spectralFlux(this.mag, this.prevMag, this.loBin, this.hiBin);
     const frame: Frame = {
@@ -267,9 +303,9 @@ export class OnsetDetector {
     for (let i = 0; i < 12; i++) avg[i] /= norm;
 
     let best: { id: string; score: number } | null = null;
-    let runnerUp = 0;
+    let runnerUp = -Infinity;
     for (const { chord, template } of TEMPLATES) {
-      const score = cosineSimilarity(avg, template);
+      const score = matchScore(avg, template);
       if (!best || score > best.score) {
         runnerUp = best?.score ?? 0;
         best = { id: chord.id, score };
@@ -281,7 +317,9 @@ export class OnsetDetector {
     // Chords share notes, so an absolute score of 0.9 means very little on its
     // own — C and Am both score high on almost any C-major-ish strum.
     const margin = best ? Math.max(0, best.score - runnerUp) : 0;
-    const chordConfidence = best ? Math.max(0, Math.min(1, (best.score - 0.55) / 0.35)) * Math.min(1, margin / 0.08) : 0;
+    // The floor moved down with the penalty, which shifts every score. Still a
+    // guess until it has heard a real guitar, like every other threshold here.
+    const chordConfidence = best ? Math.max(0, Math.min(1, (best.score - 0.45) / 0.35)) * Math.min(1, margin / 0.08) : 0;
 
     // Stroke direction from how brightness evolves across the attack. A down
     // strum starts at the bass strings and the treble arrives a few

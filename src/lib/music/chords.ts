@@ -96,16 +96,43 @@ export function chordPitchClasses(chord: Chord): PitchClass[] {
 }
 
 /**
- * A weighted 12-bin template for chroma matching. The bass note is weighted
- * higher because it is the loudest partial in a real strum and the most
- * reliable discriminator between, say, C and Am (which share two notes).
+ * Pitch-class weights of a note's harmonic series.
+ *
+ * Index is the semitone offset of harmonic h from the fundamental, folded into
+ * an octave: h=2 is the octave (0), h=3 a fifth (7), h=5 a major third (4),
+ * h=7 lands near a minor seventh (10).
+ *
+ * This is why a fundamentals-only template cannot tell C from C7. Real audio
+ * for a plain C chord contains a Bb-ish component from the seventh harmonic of
+ * every note in it, so it matches C7's template better than C's own. Building
+ * the same harmonics into the templates puts both on equal footing, and the
+ * comparison becomes one of degree rather than presence.
+ */
+const HARMONICS: { semitones: number; weight: number }[] = [
+  { semitones: 0, weight: 1 },      // h=1 fundamental
+  { semitones: 0, weight: 0.5 },    // h=2 octave
+  { semitones: 7, weight: 0.33 },   // h=3 fifth
+  { semitones: 0, weight: 0.25 },   // h=4 two octaves
+  { semitones: 4, weight: 0.2 },    // h=5 major third
+  { semitones: 7, weight: 0.16 },   // h=6 fifth
+  { semitones: 10, weight: 0.14 },  // h=7 flat seventh — the C/C7 culprit
+  { semitones: 0, weight: 0.12 },   // h=8
+];
+
+/**
+ * A weighted 12-bin template for chroma matching.
+ *
+ * The bass note is weighted higher because it is the loudest partial in a real
+ * strum and the most reliable discriminator between chords that share notes.
  */
 export function chordTemplate(chord: Chord): Float32Array {
   const t = new Float32Array(12);
   const notes = chordMidiNotes(chord);
   notes.forEach((midi, i) => {
-    const weight = i === 0 ? 1.6 : 1;
-    t[pitchClassOf(midi)] += weight;
+    const voiceWeight = i === 0 ? 1.6 : 1;
+    for (const h of HARMONICS) {
+      t[pitchClassOf(midi + h.semitones)] += voiceWeight * h.weight;
+    }
   });
   let norm = 0;
   for (const v of t) norm += v * v;
