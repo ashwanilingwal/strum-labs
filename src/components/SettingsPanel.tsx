@@ -317,6 +317,15 @@ export function SettingsPanel({
                 Your microphone, driver and speakers each add a fixed delay. If every strum reads
                 late by about the same amount, that is this number, not your playing.
               </p>
+              {/* Chroma bins accept a note within a third of a semitone. Past
+                  that the note lands in the wrong bin and chord recognition
+                  collapses — measured at 69% in tune versus 31% at 50 cents
+                  out. Timing is unaffected either way. */}
+              <p className="px-3 pb-2 text-[11px] leading-relaxed text-fg-dim">
+                Chord guesses wrong but timing fine? Check the guitar is in tune — past about a
+                third of a semitone the chord matcher falls apart, while timing carries on
+                working. <a href="/tuner" className="text-accent underline">Open the tuner</a>.
+              </p>
               <button type="button" className="btn mx-3 mb-2 text-xs" onClick={onZeroLatency} disabled={!canZero}>
                 Zero it from my last few strums
               </button>
