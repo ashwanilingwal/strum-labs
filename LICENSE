@@ -1,0 +1,52 @@
+MIT License
+
+Copyright (c) 2026 Ashwani Lingwal
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+
+================================================================================
+THE BUNDLED AUDIO IS NOT UNDER THIS LICENCE
+================================================================================
+
+The MIT terms above cover the source code. The guitar recordings in `public/`
+are third-party works under their own licences:
+
+  public/samples/acoustic/    GPL-3.0-or-later
+                             FreePats FS Seagull steel-string, from samples by
+                             Gary Campion (FlameStudios), 2008.
+                             Full text: public/samples/acoustic/GPL.txt
+                             Provenance: public/samples/acoustic/SOURCE.txt
+
+  public/samples/classical/   CC0 1.0 (public domain)
+                             FreePats Spanish classical guitar.
+
+  public/samples/electric/    CC0 1.0 (public domain)
+                             FreePats Electric Guitar FSBS (clean).
+
+The acoustic samples are copyleft. They live in their own directory, are not
+linked into the application, and are loaded at runtime like any other static
+asset — the ordinary mere-aggregation case, which is why the source code can be
+MIT. If you redistribute those files, GPL.txt and SOURCE.txt must travel with
+them.
+
+To make this project wholly permissive, delete public/samples/acoustic/ and its
+entry in src/lib/audio/samples/index.ts. Nothing else refers to it.
+
+This is a reading of the licences, not legal advice.

@@ -278,3 +278,51 @@ control is not rendered at all, rather than shown and broken.
 
 On first sign-in the newer copy wins; if the local one is newer it is pushed up,
 so signing in never silently discards work done while signed out.
+
+## Deploying
+
+Nothing needs changing to host it on Vercel — import the repo and the defaults
+are right. Only `/auth/callback` is server-rendered; every other route is static.
+
+Two things are worth knowing before the first deploy:
+
+**Supabase is optional, but its env vars are build-time.** `NEXT_PUBLIC_*`
+values are inlined when the app is built, so setting them in Vercel *after* a
+deploy does nothing until the next build. Without them the app works fully and
+the sign-in control simply isn't rendered.
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+```
+
+**OAuth redirects need registering, including previews.** Sign-in redirects to
+`<origin>/auth/callback`, and Supabase rejects any origin not on its allow list.
+Add the production URL under Authentication → URL Configuration. Vercel gives
+every preview deployment its own hostname, so add a wildcard redirect
+(`https://your-project-*.vercel.app/auth/callback`) or sign-in will fail on
+previews while working in production.
+
+The callback already reads `x-forwarded-host`, so it lands on the URL the
+browser actually used rather than Vercel's internal one.
+
+### If you add a Content-Security-Policy
+
+The microphone's AudioWorklet is loaded from a `blob:` URL, so a policy without
+`worker-src blob:` (and `script-src blob:`) silently breaks listening while
+leaving the rest of the app working. There is no CSP by default.
+
+### Caching
+
+`/samples/*` is served with a week's `max-age` and a month of
+`stale-while-revalidate`. The recordings are ~5 MB and identical between
+deploys, so without it every visit re-downloads them. It is deliberately not
+`immutable`: filenames are pitch centres (`55.flac`) and stay the same when an
+instrument is rebuilt, so a year-long immutable cache would pin listeners to
+stale audio after a library swap.
+
+## Licence
+
+MIT for the source code. **The bundled audio is not** — the steel-string
+acoustic samples are GPL-3.0-or-later. See [LICENSE](LICENSE) for what that
+does and does not mean, and how to make the project wholly permissive.
