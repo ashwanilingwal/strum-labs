@@ -17,6 +17,7 @@ const LINKS = [
   { href: "/play", label: "Play" },
   { href: "/chords", label: "Chords" },
   { href: "/patterns", label: "Patterns" },
+  { href: "/tuner", label: "Tuner" },
 ];
 
 export function Nav({
@@ -33,8 +34,11 @@ export function Nav({
       className={`wrap flex items-center gap-3 px-4 py-4 sm:gap-4 sm:px-8 ${tone === "light" ? "block-light" : ""}`}
       style={{ background: "transparent" }}
     >
+      {/* Four links plus the full wordmark overflow a 320px screen by a few
+          pixels. Abbreviating keeps home reachable, where hiding it would not. */}
       <Link href="/" className="caps shrink-0 transition hover:text-accent" style={{ color: "var(--fg)" }}>
-        StrumLab
+        <span className="min-[400px]:hidden">SL</span>
+        <span className="hidden min-[400px]:inline">StrumLab</span>
       </Link>
       {/* Always present, so the links sit hard right on a phone too. */}
       <span className="rule min-w-3 flex-1" />

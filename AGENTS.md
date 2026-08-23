@@ -18,6 +18,7 @@ Four routes:
 | `/play` | The practice screen — chords, metronome, audio, settings. |
 | `/chords` | Every chord as a browsable reference, tap to hear. |
 | `/patterns` | Saved patterns as cards with their stroke grid drawn. |
+| `/tuner` | Tuner. Its own DSP — see below. |
 
 The design is **flat editorial**: full-width blocks alternating black and lilac,
 inflated chrome type, flower confetti, tiny wide-tracked caps. There is no
@@ -44,6 +45,8 @@ Find your row, open that file, stop. None of these require reading the rest.
 | Add a **strum style** or **progression** | `lib/music/library.ts` | A style is one bar of strokes and tiles across any chord list; `buildPattern` multiplies the two. Adding one style gives every progression a new feel. |
 | What the player is practising | `mode` + `pick` in `lib/storage/settings.ts` | Selections write to the reserved `QUICK_ID` pattern, never to a saved one. |
 | How strums are **detected** | `lib/listen/detector.ts` | Thresholds live at the top as named constants. |
+| **Pitch** detection | `lib/listen/pitch.ts` | NSDF/McLeod, time domain. Do not try to reuse the onset FFT — 43 Hz bins cannot resolve cents at 82 Hz. Pure, so it can be checked against synthetic tones. |
+| Tunings, cents, string matching | `lib/music/tuning.ts` | |
 | Spectral **maths** | `lib/listen/dsp.ts`, `lib/listen/fft.ts` | Pure, no Web Audio, directly testable. |
 | **Mic setup** / permissions | `lib/listen/mic.ts` | Includes the AudioWorklet source. |
 | How a strum is **judged** | `lib/listen/scoring.ts` | `TIGHT_MS`, `CLOSE_MS`, latency offset, missed/extra, bleed rejection. |

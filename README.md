@@ -21,8 +21,8 @@ your machine.
 
 ## What's in it
 
-Four pages: a cover, the practice screen, a chord library (tap any card to hear
-it), and your saved patterns.
+Five pages: a cover, the practice screen, a chord library (tap any card to hear
+it), your saved patterns, and a tuner.
 
 You practise one of two things, and there's a toggle at the top for it: a single
 chord drilled against a rhythm, or a chord progression. Both are built the same
@@ -38,6 +38,29 @@ One detail I'm quietly pleased with: slots you *skip* still show a faint arrow
 for which way the hand is travelling. Your strumming hand never stops moving,
 it just misses the strings on the off-beats, and every chart I learned from
 drew only the hits — which taught me the wrong thing for about a year.
+
+## Tuning
+
+There's a tuner, and it isn't a side quest: the chord matcher folds audio into
+12 pitch classes, so a guitar that's 40 cents flat smears across bin boundaries
+and chord recognition quietly gets worse while the timing keeps working. That
+produces a baffling "why does it think my G is an Em" that has nothing to do
+with your playing.
+
+It needed genuinely new DSP. The FFT the onset detector uses has 43 Hz bins at
+44.1 kHz, and low E is 82 Hz — the useful range of the bottom string spans two
+bins. So the tuner works in the time domain with the McLeod / normalised square
+difference function instead. Plain autocorrelation is the obvious choice and has
+a famous failure: its peaks scale with amplitude, so it locks onto the octave
+below. Normalising each lag by the energy overlapping at that lag removes the
+bias.
+
+Unlike the strum detector, this part I could actually verify — synthetic tones
+have known frequencies. Across all six strings, as sine waves, as 12-harmonic
+sawtooths, and with noise added, it lands within **0.11 cents**, tracks
+deliberate detuning of ±50 cents to within 0.01, never picks the wrong octave,
+and returns nothing for silence or white noise. A real plucked string is messier
+than a synthetic one, so expect worse — but the algorithm is right.
 
 ## The part I actually spent time on
 
