@@ -44,7 +44,10 @@ export function StrumLane({
           // scrolls instead of compressing. Four bars never fit a phone.
           style={{ minWidth: pattern.slotsPerBar * 30 }}
         >
-          <div className="mb-1.5 flex items-baseline justify-between px-0.5">
+          {/* Bar number and its chord read as one label. Right-aligning the
+              chord put it hard against the next bar's number, so four bars in a
+              row came out as "G BAR 2". */}
+          <div className="mb-1.5 flex items-baseline gap-1.5 px-0.5">
             <span className="font-display text-[10px] uppercase tracking-[0.2em] text-fg-dim">
               bar {bar + 1}
             </span>

@@ -41,6 +41,8 @@ Find your row, open that file, stop. None of these require reading the rest.
 | Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
 | The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
 | Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
+| Add a **strum style** or **progression** | `lib/music/library.ts` | A style is one bar of strokes and tiles across any chord list; `buildPattern` multiplies the two. Adding one style gives every progression a new feel. |
+| What the player is practising | `mode` + `pick` in `lib/storage/settings.ts` | Selections write to the reserved `QUICK_ID` pattern, never to a saved one. |
 | How strums are **detected** | `lib/listen/detector.ts` | Thresholds live at the top as named constants. |
 | Spectral **maths** | `lib/listen/dsp.ts`, `lib/listen/fft.ts` | Pure, no Web Audio, directly testable. |
 | **Mic setup** / permissions | `lib/listen/mic.ts` | Includes the AudioWorklet source. |

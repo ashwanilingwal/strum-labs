@@ -24,6 +24,12 @@ your machine.
 Four pages: a cover, the practice screen, a chord library (tap any card to hear
 it), and your saved patterns.
 
+You practise one of two things, and there's a toggle at the top for it: a single
+chord drilled against a rhythm, or a chord progression. Both are built the same
+way — a strum style is one bar of strokes that tiles across whatever chords it's
+given, so six rhythms and eight progressions cover forty-eight combinations
+without storing any of them.
+
 The practice screen is the whole point. Big chord, the pattern laid out as a
 row of slots with a playhead, transport at the bottom. Everything else is
 behind the settings sheet.

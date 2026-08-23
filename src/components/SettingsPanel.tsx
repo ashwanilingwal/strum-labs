@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { emptyPattern, newPatternId, PRESETS, type Pattern } from "@/lib/music/pattern";
+import { useEffect, useRef } from "react";
+import { emptyPattern, newPatternId, type Pattern } from "@/lib/music/pattern";
 import type { AppState } from "@/lib/storage/settings";
 import type { MicStatus } from "@/hooks/useStrumEngine";
 import type { SamplerState } from "@/lib/audio/sampler";
-import type { DuckMode } from "@/lib/storage/settings";
+import { QUICK_ID, type DuckMode } from "@/lib/storage/settings";
 import type { Tone } from "@/lib/audio/engine";
 import { INSTRUMENTS, isInstrument } from "@/lib/audio/samples";
 import type { RoomProfile } from "@/lib/listen/detector";
 import type { SyncStatus } from "@/hooks/useAccount";
+import { Disclosure } from "./ui/Disclosure";
 import { PatternEditor } from "./PatternEditor";
+import { PracticePicker } from "./PracticePicker";
 import { SectionTitle, SegmentedControl, Slider, Toggle } from "./ui";
 
 /**
@@ -44,8 +46,6 @@ export function SettingsPanel({
   };
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
-  const [pickerOpen, setPickerOpen] = useState(false);
-  const [presetsOpen, setPresetsOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -104,112 +104,67 @@ export function SettingsPanel({
             thing you actually came here for — below the fold. Switching pattern
             is occasional; editing one is constant.
           */}
-          <section>
-            <SectionTitle>Pattern in play</SectionTitle>
-            <div className="panel p-1">
-              <button
-                type="button"
-                onClick={() => setPickerOpen((v) => !v)}
-                aria-expanded={pickerOpen}
-                className="flex w-full items-center gap-2 px-2 py-2 text-left"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold text-accent">{pattern.name}</span>
-                  <span className="block truncate font-lcd text-[10px] text-fg-dim">
-                    {pattern.bars} bar{pattern.bars > 1 ? "s" : ""} · {pattern.chords.join(" ")} · {pattern.bpm} bpm
-                  </span>
-                </span>
-                <span className="caps shrink-0 text-fg-dim">
-                  {pickerOpen ? "Close" : "Change"}
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="shrink-0 text-fg-dim transition-transform"
-                  style={{ transform: pickerOpen ? "rotate(180deg)" : "none" }}
-                >
-                  ▾
-                </span>
-              </button>
+          <Disclosure
+            title="What to practise"
+            summary={state.mode === "chord" ? state.pick.chordId : "Progression"}
+            defaultOpen
+          >
+            <PracticePicker state={state} setState={setState} />
+          </Disclosure>
 
-              {pickerOpen ? (
-                <div className="border-t border-line px-1 pb-1 pt-1">
-                  {state.patterns.map((p) => {
-                    const active = p.id === state.activeId;
-                    return (
-                      <div key={p.id} className="flex items-center gap-2 px-1 py-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            selectPattern(p.id);
-                            setPickerOpen(false);
-                          }}
-                          className="min-w-0 flex-1 text-left"
-                        >
-                          <span className={`block truncate text-sm font-semibold ${active ? "text-accent" : ""}`}>
-                            {active ? "\u2713 " : ""}{p.name}
-                          </span>
-                          <span className="block truncate font-lcd text-[10px] text-fg-dim">
-                            {p.bars} bar{p.bars > 1 ? "s" : ""} · {p.chords.join(" ")} · {p.bpm} bpm
-                          </span>
-                        </button>
-                        <button type="button" className="btn !px-2 !py-1 text-[11px]" onClick={() => addPattern(p)}>
-                          Copy
-                        </button>
-                        <button
-                          type="button"
-                          className="btn !px-2 !py-1 text-[11px]"
-                          onClick={() => deletePattern(p.id)}
-                          disabled={state.patterns.length <= 1}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    );
-                  })}
-
-                  <div className="mt-1 border-t border-line pt-2">
+          <Disclosure title="Saved patterns" summary={`${state.patterns.length}`}>
+            <div className="px-1 py-1">
+              {state.patterns.map((p) => {
+                const active = p.id === state.activeId;
+                return (
+                  <div key={p.id} className="flex items-center gap-2 px-1 py-1">
                     <button
                       type="button"
-                      onClick={() => setPresetsOpen((v) => !v)}
-                      aria-expanded={presetsOpen}
-                      className="caps flex w-full items-center justify-between px-1 py-1 text-fg-dim"
+                      onClick={() => selectPattern(p.id)}
+                      className="min-w-0 flex-1 text-left"
                     >
-                      Start from a preset
-                      <span aria-hidden="true">{presetsOpen ? "\u2212" : "+"}</span>
+                      <span className={`block truncate text-sm font-semibold ${active ? "text-accent" : ""}`}>
+                        {active ? "\u2713 " : ""}{p.name}
+                      </span>
+                      <span className="block truncate font-lcd text-[10px] text-fg-dim">
+                        {p.bars} bar{p.bars > 1 ? "s" : ""} \u00b7 {p.chords.join(" ")} \u00b7 {p.bpm} bpm
+                      </span>
                     </button>
-                    {presetsOpen ? (
-                      <div className="flex flex-wrap gap-1.5 px-1 pb-1 pt-1">
-                        {PRESETS.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            className="btn !px-2.5 !py-1 text-[11px]"
-                            onClick={() => addPattern(p)}
-                          >
-                            {p.name}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
+                    <button type="button" className="btn !px-2 !py-1 text-[11px]" onClick={() => addPattern(p)}>
+                      Copy
+                    </button>
+                    <button
+                      type="button"
+                      className="btn !px-2 !py-1 text-[11px]"
+                      onClick={() => deletePattern(p.id)}
+                      disabled={state.patterns.length <= 1 || p.id === QUICK_ID}
+                    >
+                      Delete
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    className="btn btn-lit mt-2 w-full !py-1.5 text-[11px]"
-                    onClick={() => addPattern(emptyPattern())}
-                  >
-                    + New empty pattern
-                  </button>
-                </div>
-              ) : null}
+                );
+              })}
+              <button
+                type="button"
+                className="btn btn-lit mt-2 w-full !py-1.5 text-[11px]"
+                onClick={() => addPattern(emptyPattern())}
+              >
+                + New empty pattern
+              </button>
             </div>
-          </section>
+          </Disclosure>
 
-          <PatternEditor pattern={pattern} onChange={setPattern} />
+          <Disclosure title="Edit this pattern" summary={pattern.name} defaultOpen>
+            <div className="px-3 py-2">
+              <PatternEditor pattern={pattern} onChange={setPattern} />
+            </div>
+          </Disclosure>
 
-          <section>
-            <SectionTitle>Sound</SectionTitle>
-            <div className="panel divide-y divide-[color:var(--line-soft)] py-1">
+          <Disclosure
+            title="Sound"
+            summary={isInstrument(state.audio.tone) ? INSTRUMENTS[state.audio.tone].label : "Synth"}
+          >
+            <div className="divide-y divide-[color:var(--line-soft)] py-1">
               <Toggle
                 label="Guitar"
                 hint="Hear the chords played back"
@@ -276,11 +231,10 @@ export function SettingsPanel({
                 onChange={(v) => setState((s) => ({ ...s, audio: { ...s.audio, countInBars: Number(v) } }))}
               />
             </div>
-          </section>
+          </Disclosure>
 
-          <section>
-            <SectionTitle>Listening</SectionTitle>
-            <div className="panel space-y-1 py-1">
+          <Disclosure title="Listening" summary={room ? room.quality : "off"}>
+            <div className="space-y-1 py-1">
               {room ? (
                 <div className="px-3 py-2">
                   <div className="mb-1 flex items-center gap-2">
@@ -360,7 +314,7 @@ export function SettingsPanel({
                 Zero it from my last few strums
               </button>
             </div>
-          </section>
+          </Disclosure>
 
           {account.configured ? (
             <section>

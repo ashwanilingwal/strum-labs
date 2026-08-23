@@ -5,12 +5,14 @@ import { chordById } from "@/lib/music/chords";
 import {
   barOfSlot, MAX_BPM, MIN_BPM, normalise, type Pattern,
 } from "@/lib/music/pattern";
-import { activePattern, appStore, type AppState } from "@/lib/storage/settings";
+import { activePattern, appStore, quickPattern, QUICK_ID, type AppState, type PracticeMode } from "@/lib/storage/settings";
 import { touchLocal, useAccount } from "@/hooks/useAccount";
 import { useStrumEngine } from "@/hooks/useStrumEngine";
 import { ChordChart } from "./chart/ChordChart";
 import { ChordSequence } from "./chart/ChordSequence";
 import { LiveFeedback } from "./LiveFeedback";
+import { ChordSheet } from "./ChordSheet";
+import { ModeToggle } from "./ModeToggle";
 import { SessionSummary } from "./SessionSummary";
 import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
@@ -35,6 +37,8 @@ export function StrumLab() {
   const state = useSyncExternalStore(appStore.subscribe, appStore.getSnapshot, appStore.getServerSnapshot);
   const pattern = activePattern(state);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** Which bar's chord the sheet is editing, or null when closed. */
+  const [chordSheetBar, setChordSheetBar] = useState<number | null>(null);
   const [zeroed, setZeroed] = useState<number | null>(null);
 
   const setState = useCallback((updater: (prev: AppState) => AppState) => {
@@ -115,6 +119,36 @@ export function StrumLab() {
       ? pattern.chords[barOfSlot(pattern, engine.lastVerdict.slot)]
       : null;
 
+  const setMode = useCallback(
+    (mode: PracticeMode) => {
+      setState((prev) => ({
+        ...prev,
+        mode,
+        activeId: QUICK_ID,
+        patterns: prev.patterns.map((p) => (p.id === QUICK_ID ? quickPattern(mode, prev.pick) : p)),
+      }));
+    },
+    [setState],
+  );
+
+  const setChordForBar = useCallback(
+    (barIndex: number, chordId: string) => {
+      setState((prev) => {
+        const target = activePattern(prev);
+        const chords = target.chords.map((c, i) => (i === barIndex ? chordId : c));
+        return {
+          ...prev,
+          // Keep the selector in step, so reopening settings shows what is
+          // actually playing rather than what was last picked there.
+          pick: prev.mode === "chord" ? { ...prev.pick, chordId } : prev.pick,
+          patterns: prev.patterns.map((p) => (p.id === target.id ? { ...p, chords } : p)),
+        };
+      });
+      setChordSheetBar(null);
+    },
+    [setState],
+  );
+
   const handleMic = () => {
     if (engine.micStatus === "off" || engine.micStatus === "error") void engine.startListening();
     else engine.stopListening();
@@ -141,6 +175,9 @@ export function StrumLab() {
     <main className="block-dark flex h-dvh flex-col overflow-hidden">
       <div className="shrink-0">
         <Nav />
+        <div className="wrap px-4 pb-2 sm:px-8">
+          <ModeToggle mode={state.mode} onChange={setMode} />
+        </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         {/*
@@ -161,7 +198,7 @@ export function StrumLab() {
         On a phone that is the only way both fit above the fold; on a desktop
         centring them stops the pair drifting to one edge of a wide screen.
       */}
-      <section className="relative px-4 py-5 sm:px-8 sm:py-8">
+      <section className={`relative px-4 sm:px-8 sm:py-8 ${showVerdicts ? "py-2" : "py-5"}`}>
         <MotifField density={0.5} />
         <div className="wrap relative z-10 flex w-full flex-col items-center gap-4">
           <div className="flex w-full items-center justify-center gap-4 sm:gap-10">
@@ -173,16 +210,42 @@ export function StrumLab() {
                     ? `Bar ${bar + 1} of ${pattern.bars}`
                     : "Ready"}
               </p>
-              <ChromeText className="mt-1 block text-[clamp(4.25rem,13vw,8rem)]">
-                {engine.countIn > 0 ? String(engine.countIn) : (chord?.symbol ?? "\u2014")}
-              </ChromeText>
+              {engine.countIn > 0 ? (
+                <ChromeText className="mt-1 block text-[clamp(4.25rem,13vw,8rem)]">
+                  {String(engine.countIn)}
+                </ChromeText>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setChordSheetBar(bar)}
+                  className="block rounded-2xl transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                  aria-label={`Change the chord for bar ${bar + 1}`}
+                >
+                  <ChromeText
+                    className={`mt-1 block ${
+                      showVerdicts
+                        ? "text-[clamp(2.5rem,9vw,8rem)]"
+                        : "text-[clamp(4.25rem,13vw,8rem)]"
+                    }`}
+                  >
+                    {chord?.symbol ?? "\u2014"}
+                  </ChromeText>
+                </button>
+              )}
               <p className="caps-lg mt-1.5 text-fg">
                 {engine.countIn > 0 ? "Get ready" : chord?.name}
               </p>
+              {engine.countIn === 0 && !showVerdicts ? (
+                <p className="caps mt-1 text-fg-dim opacity-70">tap to change</p>
+              ) : null}
             </div>
 
             {chord ? (
-              <div className="block-light card-flat w-32 shrink-0 p-3 sm:w-36 sm:p-4 lg:w-40">
+              <div
+                className={`block-light card-flat shrink-0 p-3 sm:w-36 sm:p-4 lg:w-40 ${
+                  showVerdicts ? "hidden w-24 sm:block" : "w-32"
+                }`}
+              >
                 <ChordChart chord={chord} />
               </div>
             ) : null}
@@ -191,7 +254,11 @@ export function StrumLab() {
           {/* Where you are in the progression. Replaces the old "next X" line —
               same space, but it shows the whole shape of the pattern. */}
           {pattern.bars > 1 ? (
-            <ChordSequence chords={pattern.chords} activeIndex={engine.playing ? bar : -1} />
+            <ChordSequence
+              chords={pattern.chords}
+              activeIndex={engine.playing ? bar : -1}
+              onSelect={(i) => setChordSheetBar(i)}
+            />
           ) : null}
 
           {chord && engine.countIn === 0 ? (
@@ -234,11 +301,13 @@ export function StrumLab() {
             meanErrorMs={engine.stats.meanErrorMs}
             hits={engine.stats.hits}
           />
-          <ScoreStrip
-            stats={engine.stats}
-            checkChord={state.listen.checkChord}
-            checkStroke={state.listen.checkStroke}
-          />
+          <div className="hidden sm:block">
+            <ScoreStrip
+              stats={engine.stats}
+              checkChord={state.listen.checkChord}
+              checkStroke={state.listen.checkStroke}
+            />
+          </div>
         </section>
       ) : null}
 
@@ -278,6 +347,15 @@ export function StrumLab() {
         />
         </div>
       </div>
+
+      {chordSheetBar !== null ? (
+        <ChordSheet
+          current={pattern.chords[chordSheetBar] ?? pattern.chords[0]}
+          barLabel={pattern.bars > 1 ? `Bar ${chordSheetBar + 1} of ${pattern.bars}` : "Chord"}
+          onPick={(id) => setChordForBar(chordSheetBar, id)}
+          onClose={() => setChordSheetBar(null)}
+        />
+      ) : null}
 
       {engine.summary ? (
         <SessionSummary

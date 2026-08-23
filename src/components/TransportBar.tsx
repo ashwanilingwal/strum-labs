@@ -105,9 +105,17 @@ export function TransportBar({
       {/* A gear glyph renders as an illegible speck at this size and does not
           match the editorial type elsewhere. The word is clearer and shorter
           to parse than an icon nobody has to decode. */}
-      <button type="button" onClick={onSettings} className="btn caps !px-3 sm:ml-auto sm:!px-4" aria-label="Settings">
-        <span className="sm:hidden">Set</span>
-        <span className="hidden sm:inline">Settings</span>
+      {/* An icon, not the word: on a phone the transport is the tightest row in
+          the app and "Settings" cost a whole line of it. Drawn rather than an
+          emoji, which renders as an illegible speck at this size. */}
+      <button type="button" onClick={onSettings} className="btn btn-icon sm:ml-auto" aria-label="Settings">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
+          <path
+            d="M12 2.6v2.2M12 19.2v2.2M21.4 12h-2.2M4.8 12H2.6M18.6 5.4l-1.6 1.6M7 17l-1.6 1.6M18.6 18.6L17 17M7 7L5.4 5.4"
+            stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
+          />
+        </svg>
       </button>
     </div>
   );

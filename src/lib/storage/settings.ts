@@ -9,6 +9,7 @@
 
 import type { Tone } from "../audio/engine";
 import { isInstrument } from "../audio/samples";
+import { buildChordDrill, buildPattern, PROGRESSIONS, STRUM_STYLES, strumStyleById } from "../music/library";
 import { normalise, PRESETS, type Pattern } from "../music/pattern";
 import { createLocalStore, type ExternalStore } from "./store";
 
@@ -43,9 +44,28 @@ export interface ListenSettings {
   duckMode: DuckMode;
 }
 
+/** Practising one chord, or a progression. Picks which selector the UI shows. */
+export type PracticeMode = "chord" | "pattern";
+
+/**
+ * Quick picks are written into one reserved pattern rather than appended.
+ *
+ * Choosing a chord or a progression is browsing, not authoring — it should not
+ * spawn a new saved pattern every time, and it must never overwrite one the
+ * player built. Everything picked lands here; everything saved lives beside it.
+ */
+export const QUICK_ID = "quick-pick";
+
 export interface AppState {
   patterns: Pattern[];
   activeId: string;
+  mode: PracticeMode;
+  /** What each selector was last set to, so switching modes restores it. */
+  pick: {
+    chordId: string;
+    progressionId: string;
+    styleId: string;
+  };
   audio: AudioSettings;
   listen: ListenSettings;
   /** Set once the room has been measured, so we don't re-ask every session. */
@@ -70,11 +90,30 @@ export const DEFAULT_LISTEN: ListenSettings = {
   duckMode: "mute",
 };
 
+export const DEFAULT_PICK = {
+  chordId: "G",
+  progressionId: "four-chords",
+  styleId: "folk",
+};
+
+/** Rebuild the reserved quick-pick pattern from the current selection. */
+export function quickPattern(mode: PracticeMode, pick: AppState["pick"]): Pattern {
+  const style = strumStyleById(pick.styleId) ?? STRUM_STYLES[0];
+  if (mode === "chord") {
+    return { ...buildChordDrill(style, pick.chordId), id: QUICK_ID };
+  }
+  const prog = PROGRESSIONS.find((p) => p.id === pick.progressionId) ?? PROGRESSIONS[0];
+  return { ...buildPattern(style, prog.chords, `${prog.name} · ${style.name}`), id: QUICK_ID };
+}
+
 export function initialState(): AppState {
-  const patterns = PRESETS.map((p) => ({ ...p }));
+  const pick = { ...DEFAULT_PICK };
+  const patterns = [quickPattern("chord", pick), ...PRESETS.map((p) => ({ ...p }))];
   return {
     patterns,
-    activeId: patterns[1].id,
+    activeId: QUICK_ID,
+    mode: "chord",
+    pick,
     audio: { ...DEFAULT_AUDIO },
     listen: { ...DEFAULT_LISTEN },
     roomNoiseDb: null,
@@ -95,7 +134,17 @@ export function reviveState(raw: unknown): AppState {
     ? r.patterns.map((p) => normalise({ ...base.patterns[0], ...p }))
     : base.patterns;
 
-  const activeId = patterns.some((p) => p.id === r.activeId) ? r.activeId! : patterns[0].id;
+  const pick = { ...base.pick, ...(r.pick ?? {}) };
+  const mode: PracticeMode = r.mode === "pattern" ? "pattern" : "chord";
+
+  // The reserved slot must always exist — stored state from before it did, or
+  // one where it was deleted, would otherwise leave the selectors pointing at
+  // nothing.
+  if (!patterns.some((p) => p.id === QUICK_ID)) {
+    patterns.unshift(quickPattern(mode, pick));
+  }
+
+  const activeId = patterns.some((p) => p.id === r.activeId) ? r.activeId! : QUICK_ID;
 
   // A tone stored by an older version (or a device that has since had an
   // instrument removed) must not reach the engine unrecognised.
@@ -105,6 +154,8 @@ export function reviveState(raw: unknown): AppState {
   return {
     patterns,
     activeId,
+    mode,
+    pick,
     audio,
     listen: { ...base.listen, ...(r.listen ?? {}) },
     roomNoiseDb: typeof r.roomNoiseDb === "number" ? r.roomNoiseDb : null,

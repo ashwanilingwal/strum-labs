@@ -69,6 +69,16 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   // stop() is a stable callback and cannot read `stats` from its closure, so
   // the latest value is mirrored here.
   const statsRef = useRef<SessionStats>(emptyStats());
+
+  /**
+   * The count-in exists to hand you the tempo before the first bar. Once you
+   * have it, hearing 4-3-2-1 again on every restart is just a delay between you
+   * and the thing you are practising — and restarting is constant while
+   * drilling. So it plays on the first start and then stays quiet until
+   * something changes what you are counting into: a different pattern, or a
+   * different tempo.
+   */
+  const countedInFor = useRef<string | null>(null);
   const [heard, setHeard] = useState<HeardNote | null>(null);
 
   // Live copies for the scheduling callbacks, which must not be rebuilt on
@@ -197,7 +207,10 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     const a = audioRef.current;
     const beat = 60 / p.bpm;
     const t0 = engine.currentTime + 0.15;
-    const countBeats = a.countInBars * p.beatsPerBar;
+    const signature = `${p.id}:${p.bpm}:${a.countInBars}`;
+    const needsCountIn = countedInFor.current !== signature;
+    countedInFor.current = signature;
+    const countBeats = needsCountIn ? a.countInBars * p.beatsPerBar : 0;
 
     for (let i = 0; i < countBeats; i++) {
       engine.click(t0 + i * beat, i % p.beatsPerBar === 0);
