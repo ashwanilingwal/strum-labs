@@ -21,7 +21,8 @@ import {
   chroma, cosineSimilarity, dbfs, median, MAX_HZ, MIN_HZ,
   rms, spectralCentroid, spectralFlux, trebleRatio,
 } from "./dsp";
-import { CHORDS, chordTemplate, type Chord } from "../music/chords";
+import { CHORDS, chordBassPitchClass, chordTemplate, type Chord } from "../music/chords";
+import { midiToFreq, pitchClassOf } from "../music/theory";
 
 const FFT_SIZE = 1024;
 const HOP = 256;
@@ -55,6 +56,8 @@ export interface Onset {
   /** Best-matching chord id, and how confident that match is (0..1). */
   chordGuess: string | null;
   chordConfidence: number;
+  /** Pitch class of the lowest note heard, or null if it could not be tracked. */
+  bassPitchClass: number | null;
   /** "down" | "up" and how confident, from how the brightness evolves. */
   stroke: "down" | "up";
   strokeConfidence: number;
@@ -69,10 +72,25 @@ interface Frame {
   chroma: Float32Array;
 }
 
-const TEMPLATES: { chord: Chord; template: Float32Array }[] = CHORDS.map((chord) => ({
+const TEMPLATES: { chord: Chord; template: Float32Array; bass: number }[] = CHORDS.map((chord) => ({
   chord,
   template: chordTemplate(chord),
+  bass: chordBassPitchClass(chord),
 }));
+
+/** Samples held for bass tracking. Zero-padded to BASS_FFT before transform. */
+const BASS_WINDOW = 2048;
+/** Padding buys interpolation, not resolution — enough to place a peak. */
+const BASS_FFT = 4096;
+/** Plausible bass notes: D2 up to G3. */
+const BASS_LOW_MIDI = 38;
+const BASS_HIGH_MIDI = 55;
+/**
+ * Weight on the candidate's own fundamental relative to its harmonics.
+ * Swept over synthetic chords: 1 gives 23/32 roots right, 1.5 and 2.5 give
+ * 25/32. Any bias toward lower candidates made it worse (18/32 at 1.04).
+ */
+const BASS_FUNDAMENTAL_WEIGHT = 1.5;
 
 /**
  * How hard to punish template mass the signal does not support.
@@ -88,11 +106,72 @@ const TEMPLATES: { chord: Chord; template: Float32Array }[] = CHORDS.map((chord)
  */
 const UNSUPPORTED_PENALTY = 0.5;
 
+/**
+ * How much agreeing with the detected bass note is worth.
+ *
+ * The FFT used for everything else cannot do this job: 43 Hz bins at 44.1 kHz,
+ * while E2 and A2 are 28 Hz apart. So the bass is tracked in the time domain
+ * on a low-passed copy, using the same detector the tuner uses.
+ */
+const BASS_BONUS = 0.35;
+
+const bassFft = new FFT(BASS_FFT);
+const bassWindow = hannWindow(BASS_WINDOW);
+const bassScratch = new Float32Array(BASS_FFT);
+const bassMag = new Float32Array(BASS_FFT / 2);
+
+/**
+ * Which note is underneath the chord.
+ *
+ * Scores every plausible bass note by the energy at its fundamental and first
+ * three harmonics. The obvious approach — reuse the tuner's pitch detector — is
+ * wrong here and measurably so: NSDF asks "is this buffer periodic", a chord is
+ * not periodic at any single lag, and it abstained on 29 of 32 chords. Low-pass
+ * filtering first did not help, because five of six strings sit below any
+ * cutoff that still passes a bass note.
+ */
+function detectBassPitchClass(samples: Float32Array, sampleRate: number): number | null {
+  bassScratch.fill(0);
+  for (let i = 0; i < BASS_WINDOW; i++) bassScratch[i] = samples[i] * bassWindow[i];
+  bassFft.magnitudes(bassScratch, bassMag);
+
+  const magAt = (hz: number) => {
+    const b = (hz * BASS_FFT) / sampleRate;
+    const i = Math.floor(b);
+    const f = b - i;
+    if (i < 1 || i + 1 >= bassMag.length) return 0;
+    return bassMag[i] * (1 - f) + bassMag[i + 1] * f;
+  };
+
+  let best: number | null = null;
+  let bestScore = 0;
+  for (let midi = BASS_LOW_MIDI; midi <= BASS_HIGH_MIDI; midi++) {
+    const f0 = midiToFreq(midi);
+    const score =
+      BASS_FUNDAMENTAL_WEIGHT * magAt(f0) +
+      0.6 * magAt(2 * f0) +
+      0.35 * magAt(3 * f0) +
+      0.2 * magAt(4 * f0);
+    if (score > bestScore) {
+      bestScore = score;
+      best = midi;
+    }
+  }
+  return best === null ? null : pitchClassOf(best);
+}
+
 /** Similarity, less whatever the template expects and the signal lacks. */
-function matchScore(observed: Float32Array, template: Float32Array): number {
+function matchScore(
+  observed: Float32Array,
+  template: Float32Array,
+  templateBass: number,
+  heardBass: number | null,
+): number {
   let unsupported = 0;
   for (let i = 0; i < 12; i++) unsupported += Math.max(0, template[i] - observed[i]);
-  return cosineSimilarity(observed, template) - UNSUPPORTED_PENALTY * unsupported;
+  const base = cosineSimilarity(observed, template) - UNSUPPORTED_PENALTY * unsupported;
+  if (heardBass === null) return base;
+  return base + (heardBass === templateBass ? BASS_BONUS : 0);
 }
 
 export class OnsetDetector {
@@ -105,6 +184,8 @@ export class OnsetDetector {
   private hasPending = false;
 
   private mag = new Float32Array(FFT_SIZE / 2);
+  /** Longer than the FFT window: pitch needs periods, not resolution. */
+  private bassRing = new Float32Array(BASS_WINDOW);
   private prevMag = new Float32Array(FFT_SIZE / 2);
   /**
    * Flux is a difference against the previous spectrum, and `prevMag` starts
@@ -223,6 +304,8 @@ export class OnsetDetector {
     // Slide the analysis window along by one hop.
     this.ring.copyWithin(0, HOP);
     this.ring.set(hop, FFT_SIZE - HOP);
+    this.bassRing.copyWithin(0, HOP);
+    this.bassRing.set(hop, BASS_WINDOW - HOP);
     this.ringFill = Math.min(FFT_SIZE, this.ringFill + HOP);
     if (this.ringFill < FFT_SIZE) return;
 
@@ -302,10 +385,12 @@ export class OnsetDetector {
     norm = Math.sqrt(norm) || 1;
     for (let i = 0; i < 12; i++) avg[i] /= norm;
 
+    const heardBass = detectBassPitchClass(this.bassRing, this.sampleRate);
+
     let best: { id: string; score: number } | null = null;
     let runnerUp = -Infinity;
-    for (const { chord, template } of TEMPLATES) {
-      const score = matchScore(avg, template);
+    for (const { chord, template, bass } of TEMPLATES) {
+      const score = matchScore(avg, template, bass, heardBass);
       if (!best || score > best.score) {
         runnerUp = best?.score ?? 0;
         best = { id: chord.id, score };
@@ -341,6 +426,7 @@ export class OnsetDetector {
       chroma: avg,
       chordGuess: best?.id ?? null,
       chordConfidence,
+      bassPitchClass: heardBass,
       stroke,
       strokeConfidence,
     };

@@ -90,6 +90,18 @@ export function soundingStrings(chord: Chord): number[] {
   return chord.frets.map((f, i) => (f >= 0 ? i : -1)).filter((i) => i >= 0);
 }
 
+/**
+ * Pitch class of the lowest sounding string.
+ *
+ * This is the only thing separating some chords: Dsus2 and Asus4 contain
+ * exactly the same notes, as do Asus2 and Esus4. Nothing in a pitch-class
+ * profile can tell those apart, because there is nothing to tell apart — only
+ * which note is underneath them differs.
+ */
+export function chordBassPitchClass(chord: Chord): PitchClass {
+  return pitchClassOf(chordMidiNotes(chord)[0]);
+}
+
 /** The set of pitch classes in the chord — the target the mic matches against. */
 export function chordPitchClasses(chord: Chord): PitchClass[] {
   return Array.from(new Set(chordMidiNotes(chord).map(pitchClassOf))).sort((a, b) => a - b);
