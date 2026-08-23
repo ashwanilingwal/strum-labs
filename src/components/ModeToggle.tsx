@@ -3,9 +3,15 @@
 import type { PracticeMode } from "@/lib/storage/settings";
 
 /**
- * Chords or progressions. The same control appears on the play screen and in
- * the settings sheet, because it answers the same question in both places:
- * what am I practising right now.
+ * Chords or progressions.
+ *
+ * Deliberately small and centred on the play screen — it is a label you glance
+ * at, not a control you use often, and at full width it read as the most
+ * important thing on a page where the chord and the lane are.
+ *
+ * Locked while the metronome runs: switching mode rebuilds the pattern under a
+ * running transport, so the bar you are hearing stops matching the one on
+ * screen.
  */
 
 const MODES: { id: PracticeMode; label: string; hint: string }[] = [
@@ -14,14 +20,22 @@ const MODES: { id: PracticeMode; label: string; hint: string }[] = [
 ];
 
 export function ModeToggle({
-  mode, onChange, showHints = false,
+  mode, onChange, showHints = false, disabled = false, onBlocked, compact = false,
 }: {
   mode: PracticeMode;
   onChange: (m: PracticeMode) => void;
   showHints?: boolean;
+  disabled?: boolean;
+  onBlocked?: () => void;
+  /** Small, centred, header-sized. Used on the play screen. */
+  compact?: boolean;
 }) {
   return (
-    <div className="panel-sunken flex gap-1 p-1" role="radiogroup" aria-label="What to practise">
+    <div
+      className={`panel-sunken flex gap-1 p-1 ${compact ? "mx-auto w-fit rounded-full" : ""}`}
+      role="radiogroup"
+      aria-label="What to practise"
+    >
       {MODES.map((m) => {
         const on = m.id === mode;
         return (
@@ -30,17 +44,20 @@ export function ModeToggle({
             type="button"
             role="radio"
             aria-checked={on}
-            onClick={() => onChange(m.id)}
-            className="flex-1 rounded-full px-3 py-1.5 text-center transition"
+            aria-disabled={disabled || undefined}
+            onClick={() => (disabled ? onBlocked?.() : onChange(m.id))}
+            className={`rounded-full text-center transition ${
+              compact ? "px-3 py-1" : "flex-1 px-3 py-1.5"
+            }`}
             style={{
               background: on ? "var(--chrome-200)" : "transparent",
               color: on ? "#131820" : "var(--fg-dim)",
+              opacity: disabled && !on ? 0.45 : 1,
+              cursor: disabled ? "not-allowed" : "pointer",
             }}
           >
-            <span className="caps-lg block">{m.label}</span>
-            {showHints ? (
-              <span className="caps block opacity-70">{m.hint}</span>
-            ) : null}
+            <span className={compact ? "caps block" : "caps-lg block"}>{m.label}</span>
+            {showHints ? <span className="caps block opacity-70">{m.hint}</span> : null}
           </button>
         );
       })}

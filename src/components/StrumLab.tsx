@@ -39,6 +39,11 @@ export function StrumLab() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** Which bar's chord the sheet is editing, or null when closed. */
   const [chordSheetBar, setChordSheetBar] = useState<number | null>(null);
+  /**
+   * Why a control just refused. Cleared on a timer rather than left on screen,
+   * because it is a nudge, not a state you need to dismiss.
+   */
+  const [blocked, setBlocked] = useState<string | null>(null);
   const [zeroed, setZeroed] = useState<number | null>(null);
 
   const setState = useCallback((updater: (prev: AppState) => AppState) => {
@@ -149,6 +154,11 @@ export function StrumLab() {
     [setState],
   );
 
+  const warn = useCallback((message: string) => {
+    setBlocked(message);
+    window.setTimeout(() => setBlocked((cur) => (cur === message ? null : cur)), 2600);
+  }, []);
+
   const handleMic = () => {
     if (engine.micStatus === "off" || engine.micStatus === "error") void engine.startListening();
     else engine.stopListening();
@@ -174,9 +184,18 @@ export function StrumLab() {
      */
     <main className="block-dark flex h-dvh flex-col overflow-hidden">
       <div className="shrink-0">
-        <Nav />
-        <div className="wrap px-4 pb-2 sm:px-8">
-          <ModeToggle mode={state.mode} onChange={setMode} />
+        <Nav
+          blocked={engine.playing}
+          onBlocked={(label) => warn(`Stop the metronome before opening ${label}.`)}
+        />
+        <div className="wrap px-4 pb-1 sm:px-8">
+          <ModeToggle
+            mode={state.mode}
+            onChange={setMode}
+            compact
+            disabled={engine.playing}
+            onBlocked={() => warn("Stop the metronome to switch between chords and patterns.")}
+          />
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
@@ -232,18 +251,36 @@ export function StrumLab() {
                   </ChromeText>
                 </button>
               )}
-              <p className="caps-lg mt-1.5 text-fg">
-                {engine.countIn > 0 ? "Get ready" : chord?.name}
-              </p>
-              {engine.countIn === 0 && !showVerdicts ? (
-                <p className="caps mt-1 text-fg-dim opacity-70">tap to change</p>
-              ) : null}
+              <div className="mt-1.5 flex items-center justify-center gap-2">
+                <p className="caps-lg text-fg">
+                  {engine.countIn > 0 ? "Get ready" : chord?.name}
+                </p>
+                {engine.countIn === 0 ? (
+                  // The big chord is already a button, but nothing said so.
+                  // A control that only works if you guess it is there is not
+                  // a control.
+                  <button
+                    type="button"
+                    onClick={() => setChordSheetBar(bar)}
+                    className="btn btn-icon !h-7 !w-7 shrink-0"
+                    aria-label={`Change the chord for bar ${bar + 1}`}
+                    title="Change chord"
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                      <path
+                        d="M4 20h4l10-10a2.8 2.8 0 0 0-4-4L4 16v4Z"
+                        stroke="currentColor" strokeWidth="2" strokeLinejoin="round"
+                      />
+                    </svg>
+                  </button>
+                ) : null}
+              </div>
             </div>
 
             {chord ? (
               <div
-                className={`block-light card-flat shrink-0 p-3 sm:w-36 sm:p-4 lg:w-40 ${
-                  showVerdicts ? "hidden w-24 sm:block" : "w-32"
+                className={`block-light card-flat shrink-0 sm:w-36 sm:p-4 lg:w-40 ${
+                  showVerdicts ? "w-20 p-2" : "w-32 p-3"
                 }`}
               >
                 <ChordChart chord={chord} />
@@ -327,6 +364,15 @@ export function StrumLab() {
 
         </div>
       </div>
+
+      {/* Derived rather than cleared in an effect: the notice only means
+          anything while the transport is running, so stopping retires it
+          without any state to synchronise. */}
+      {blocked && engine.playing ? (
+        <div className="wrap shrink-0 px-4 pb-1 sm:px-8" role="status">
+          <p className="text-center text-xs text-close">{blocked}</p>
+        </div>
+      ) : null}
 
       <div className="shrink-0 border-t border-line bg-ink/95 px-4 py-3 sm:px-8">
         <div className="wrap">

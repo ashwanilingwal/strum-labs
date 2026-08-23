@@ -112,6 +112,10 @@ export function SettingsPanel({
             <PracticePicker state={state} setState={setState} />
           </Disclosure>
 
+          {/* Both of these are about progressions. In chord mode there is one
+              bar and one chord, chosen above — a stroke editor and a pattern
+              library are answering a question nobody asked yet. */}
+          {state.mode === "pattern" ? (
           <Disclosure title="Saved patterns" summary={`${state.patterns.length}`}>
             <div className="px-1 py-1">
               {state.patterns.map((p) => {
@@ -153,12 +157,15 @@ export function SettingsPanel({
               </button>
             </div>
           </Disclosure>
+          ) : null}
 
-          <Disclosure title="Edit this pattern" summary={pattern.name} defaultOpen>
-            <div className="px-3 py-2">
-              <PatternEditor pattern={pattern} onChange={setPattern} />
-            </div>
-          </Disclosure>
+          {state.mode === "pattern" ? (
+            <Disclosure title="Edit this pattern" summary={pattern.name} defaultOpen>
+              <div className="px-3 py-2">
+                <PatternEditor pattern={pattern} onChange={setPattern} />
+              </div>
+            </Disclosure>
+          ) : null}
 
           <Disclosure
             title="Sound"
