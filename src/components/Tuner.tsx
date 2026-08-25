@@ -78,7 +78,9 @@ export function Tuner() {
                 ? " "
                 : verdict === "in-tune"
                   ? "In tune"
-                  : `${Math.abs(Math.round(reading.cents))} cents ${verdict}`}
+                  : verdict === "flat"
+                    ? `Tune up · ${Math.abs(Math.round(reading.cents))} low`
+                    : `Tune down · ${Math.abs(Math.round(reading.cents))} high`}
           </p>
 
           {/* needle */}
@@ -106,9 +108,9 @@ export function Tuner() {
               ) : null}
             </div>
             <div className="mt-1 flex justify-between font-lcd text-[10px] uppercase tracking-widest text-fg-dim">
-              <span>flat</span>
+              <span>too low</span>
               <span>{hz ? `${hz.toFixed(1)} Hz` : "—"}</span>
-              <span>sharp</span>
+              <span>too high</span>
             </div>
           </div>
 
@@ -158,7 +160,7 @@ export function Tuner() {
 
           {message ? <p className="mt-3 text-center text-xs text-loose">{message}</p> : null}
 
-          {listening && clarity > 0 && clarity < 0.95 ? (
+          {listening && clarity > 0 && clarity < 0.7 ? (
             <p className="mt-3 max-w-sm text-center text-xs text-close">
               Reading is unsteady — play one string on its own and let it ring.
             </p>

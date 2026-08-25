@@ -122,9 +122,9 @@ export function LiveFeedback({
           </div>
 
           <div className="mt-1 flex justify-between font-lcd text-[9px] uppercase tracking-widest text-fg-dim">
-            <span>rushing</span>
+            <span>early</span>
             <span>{hits >= 4 ? `avg ${meanErrorMs > 0 ? "+" : ""}${meanErrorMs.toFixed(0)} ms` : "on the beat"}</span>
-            <span>dragging</span>
+            <span>late</span>
           </div>
         </div>
       </div>

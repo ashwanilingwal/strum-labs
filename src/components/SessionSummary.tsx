@@ -58,7 +58,7 @@ export function SessionSummary({
     {
       label: "Average",
       value: stats.hits ? `${stats.meanErrorMs > 0 ? "+" : ""}${stats.meanErrorMs.toFixed(0)} ms` : "—",
-      hint: stats.hits ? (stats.meanErrorMs > 0 ? "dragging" : "rushing") : undefined,
+      hint: stats.hits ? (stats.meanErrorMs > 0 ? "late" : "early") : undefined,
     },
     { label: "Consistency", value: stats.hits ? `±${stats.spreadMs.toFixed(0)} ms` : "—", hint: "spread" },
     { label: "Missed", value: String(stats.missed) },

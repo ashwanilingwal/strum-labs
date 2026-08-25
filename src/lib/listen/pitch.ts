@@ -16,8 +16,12 @@
  * checked against synthetic tones without a microphone anywhere near it.
  */
 
-/** Below this the result is noise, not a note. */
-const CLARITY_FLOOR = 0.9;
+/**
+ * Below this the result is noise, not a note. The default is strict on
+ * purpose; a caller already tracking a note may pass something looser to
+ * follow it through its decay — see useTuner.
+ */
+const DEFAULT_CLARITY = 0.9;
 /** Guitar range with headroom: low E is 82.4 Hz, 24th-fret high E is 1319 Hz. */
 export const MIN_HZ = 60;
 export const MAX_HZ = 1400;
@@ -32,7 +36,7 @@ export interface PitchResult {
  * @param buffer time-domain samples, at least two periods of the lowest note
  *               you expect (about 1100 samples at 44.1 kHz for low E)
  */
-export function detectPitch(buffer: Float32Array, sampleRate: number): PitchResult | null {
+export function detectPitch(buffer: Float32Array, sampleRate: number, minClarity = DEFAULT_CLARITY): PitchResult | null {
   const n = buffer.length;
   const maxLag = Math.min(n - 1, Math.floor(sampleRate / MIN_HZ));
   const minLag = Math.max(2, Math.floor(sampleRate / MAX_HZ));
@@ -75,7 +79,7 @@ export function detectPitch(buffer: Float32Array, sampleRate: number): PitchResu
 
   let highest = 0;
   for (const p of peaks) if (nsdf[p] > highest) highest = nsdf[p];
-  if (highest < CLARITY_FLOOR) return null;
+  if (highest < minClarity) return null;
 
   const threshold = highest * 0.9;
   const chosen = peaks.find((p) => nsdf[p] >= threshold);

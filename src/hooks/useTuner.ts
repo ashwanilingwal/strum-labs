@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getEngine } from "@/lib/audio/engine";
 import { detectPitch } from "@/lib/listen/pitch";
 import { MicError, openMic, type MicCapture } from "@/lib/listen/mic";
+import { centsBetween } from "@/lib/music/tuning";
 
 /**
  * Microphone -> pitch, for the tuner.
@@ -24,6 +25,28 @@ const WINDOW = 2048;
 const ANALYSE_EVERY_MS = 50;
 const SMOOTH_FRAMES = 5;
 
+/**
+ * Acquire strictly, hold loosely.
+ *
+ * A decaying string loses periodicity "quality" long before it stops being
+ * audible — harmonics decay at different rates and the noise floor grows
+ * relative to the signal — so one strict gate reads only the loud first second
+ * or two of a five-second note and then blinks out. Acquisition still demands
+ * a clean reading; once a note is held, following it only has to clear the
+ * lower bar, and a short grace period bridges frames where even that fails.
+ */
+const ACQUIRE_CLARITY = 0.9;
+/**
+ * Swept on a synthetic decaying string: 0.9 reads to 1.44s, 0.6 to 1.81s, 0.5
+ * to 2.02s. Below 0.7 the occasional wrong frame appears, but those are
+ * octave errors — over a thousand cents out — and FOLLOW_CENTS rejects them.
+ */
+const HOLD_CLARITY = 0.5;
+/** A reading this far from the held note is a different string, not drift. */
+const FOLLOW_CENTS = 250;
+/** How long the display keeps the last reading when frames fail. */
+const HOLD_MS = 900;
+
 export type TunerStatus = "off" | "opening" | "listening" | "error";
 
 export function useTuner() {
@@ -37,12 +60,16 @@ export function useTuner() {
   const filledRef = useRef(0);
   const lastRunRef = useRef(0);
   const recentRef = useRef<number[]>([]);
+  /** The note currently on screen, readable synchronously from the mic callback. */
+  const heldHzRef = useRef<number | null>(null);
+  const lastGoodAtRef = useRef(0);
 
   const stop = useCallback(() => {
     captureRef.current?.stop();
     captureRef.current = null;
     recentRef.current = [];
     filledRef.current = 0;
+    heldHzRef.current = null;
     setStatus("off");
     setHz(null);
     setClarity(0);
@@ -71,20 +98,41 @@ export function useTuner() {
         if (now - lastRunRef.current < ANALYSE_EVERY_MS) return;
         lastRunRef.current = now;
 
-        const result = detectPitch(ring, sampleRate);
-        if (!result) {
-          recentRef.current = [];
-          setHz(null);
-          setClarity(0);
+        const held = heldHzRef.current;
+        const result = detectPitch(ring, sampleRate, held === null ? ACQUIRE_CLARITY : HOLD_CLARITY);
+
+        let accepted: typeof result = null;
+        if (result) {
+          if (held === null || Math.abs(centsBetween(result.hz, held)) <= FOLLOW_CENTS) {
+            accepted = result;
+          } else if (result.clarity >= ACQUIRE_CLARITY) {
+            // A clean reading far from the held note is a new string being
+            // played, not drift — switch to it rather than clinging on.
+            recentRef.current = [];
+            accepted = result;
+          }
+        }
+
+        if (accepted) {
+          lastGoodAtRef.current = now;
+          const recent = recentRef.current;
+          recent.push(accepted.hz);
+          if (recent.length > SMOOTH_FRAMES) recent.shift();
+          const sorted = [...recent].sort((a, b) => a - b);
+          const median = sorted[sorted.length >> 1];
+          heldHzRef.current = median;
+          setHz(median);
+          setClarity(accepted.clarity);
           return;
         }
 
-        const recent = recentRef.current;
-        recent.push(result.hz);
-        if (recent.length > SMOOTH_FRAMES) recent.shift();
-        const sorted = [...recent].sort((a, b) => a - b);
-        setHz(sorted[sorted.length >> 1]);
-        setClarity(result.clarity);
+        // Nothing usable this frame. Keep the last reading briefly rather
+        // than blinking, then let go for real.
+        if (held !== null && now - lastGoodAtRef.current < HOLD_MS) return;
+        heldHzRef.current = null;
+        recentRef.current = [];
+        setHz(null);
+        setClarity(0);
       });
 
       captureRef.current = capture;

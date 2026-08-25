@@ -67,7 +67,7 @@ export function verdictVisual(grade: Grade, errorMs: number): GradeVisual {
     ...base,
     glyph: early ? "\u00ab" : "\u00bb",
     label: grade === "close"
-      ? (early ? "Rushing" : "Dragging")
+      ? (early ? "Early" : "Late")
       : (early ? "Way early" : "Way late"),
     coaching: early
       ? "You're ahead of the beat — let the click lead, don't chase it."
