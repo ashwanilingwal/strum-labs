@@ -16,7 +16,7 @@ Four routes:
 | --- | --- |
 | `/` | Cover. One wordmark, one sentence, one way in. It does nothing else on purpose. |
 | `/play` | The practice screen — chords, metronome, audio, settings. |
-| `/learn` | Chords, patterns and exercises as tabs (`?tab=`). `/chords` and `/patterns` redirect here. |
+| `/learn` | Chords and patterns as tabs (`?tab=`). `/chords` and `/patterns` redirect here; the Exercises tile signposts to the play screen. |
 | `/tuner` | Tuner. Its own DSP — see below. |
 | `/songs` | Follow-along song player: fingerpick or strum, live pace control. |
 
@@ -45,7 +45,7 @@ Find your row, open that file, stop. None of these require reading the rest.
 | Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
 | The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
 | Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
-| Add an **exercise** | `lib/music/exercises.ts` → `EXERCISES` | Data only, three kinds: strum drills carry a `Pattern` (opens in /play, mic-scorable); technique drills carry a two-bar `Song` (plays inline); listening games carry `notes` targets (open at `/game?id=`, untimed, mic-confirmed). Add to the level it belongs to, not the end. |
+| Add an **exercise** | `lib/music/exercises.ts` → `EXERCISES` | Data only, ONE kind: a listening game — `notes` targets, untimed, mic-confirmed. They live in the play screen's Exercises mode (`ExerciseMode.tsx` + `NoteGameBody.tsx`). Chord/pattern drills are not exercises — those worlds are the other two play modes. Add to the level it belongs to, not the end. |
 | The **note game** rules | `lib/listen/noteGame.ts` | Pure matcher — frames in, hit/progress out. Tolerance 60 cents (a finding game, not a tuning game), 4 steady frames to hit, 700ms post-hit deafness so the ringing string cannot claim the next target. Tested with synthetic frames. |
 | Add a **song** | `lib/music/songs.ts` → `SONGS` | Data only — sections of bars, each with a chord id and a picking array; hammer/pull as `art` on a step. No code changes, which is what makes MCP-driven additions possible later. Progressions are facts and shippable; note-for-note transcriptions of recordings are not — write practice arrangements and say so in the song's `note`. |
 | Add a **strum style** or **progression** | `lib/music/library.ts` | A style is one bar of strokes and tiles across any chord list; `buildPattern` multiplies the two. Adding one style gives every progression a new feel. |

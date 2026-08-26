@@ -22,12 +22,14 @@ your machine.
 ## What's in it
 
 Six pages: a cover, the practice screen, a learning hub, a tuner, a song
-player, and the legal fine print. The hub (`/learn`) holds three tabs — the
-chord library (tap any card to hear it), your saved patterns (filterable, with
-one-tap previews), and a graded exercise curriculum from first downstrokes to
-barre endurance: strum drills open in the practice screen where the mic can
-score them, technique drills (hammer-ons, pull-offs, picking rolls) play inline
-with the chart animating.
+player, and the legal fine print. The practice screen has three modes — drill a
+chord, play a progression, or the exercise curriculum: fourteen graded
+listening games, from naming the open strings through hammer-ons and pull-offs
+to four-finger spider drills and picking rolls. Every exercise is the same
+game: the app names a note, you find it at your own pace, the microphone
+confirms and deals the next. The hub (`/learn`) holds the chord library (tap
+any card to hear it) and your saved patterns (filterable, with one-tap
+previews).
 
 The song player follows along with you: pick a pace from 40% to 110% of the
 song's own tempo, fingerpicked or strummed. The active chord's chart lights the

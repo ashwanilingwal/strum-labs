@@ -1,21 +1,19 @@
 /**
- * The exercise curriculum: graded drills from first sounds to speed work.
+ * The exercise curriculum: technique games, graded finger by finger.
  *
- * Everything is data over machinery that already exists. A strum drill is a
- * `Pattern` and can be sent straight to the practice screen, microphone
- * scoring included. A technique drill (hammer-ons, pull-offs, picking rolls)
- * is a tiny `Song` — the song player's picking arrays, articulation arcs and
- * pace slider are exactly a drill player once the song is two bars long.
+ * Everything here is one kind of thing on purpose. An earlier version mixed
+ * three formats — strum drills that left for the play screen, watch-along
+ * technique loops, and listening games — and practising meant learning three
+ * UIs. Now every exercise is a listening game: the app names a note, you find
+ * it at your own pace, the microphone confirms. Chords and progressions are
+ * deliberately absent — they have their own world in the play screen's other
+ * modes and the Learn page.
  *
- * Ordering matters and is pedagogical: each level assumes only what earlier
- * levels taught. Add new drills to the level they belong to, not the end.
+ * Ordering matters and is pedagogical: open strings before one finger, one
+ * finger before two, hammer-ons only after the fingers they need. Add new
+ * games to the level they belong to, not the end.
  */
 
-import { buildChordDrill, buildPattern, STRUM_STYLES } from "./library";
-import type { Pattern } from "./pattern";
-import type { Song, SongBar, PickStep } from "./songs";
-
-/** One target in a listening game: a note named by where it lives. */
 export interface NoteTarget {
   string: number;
   fret: number;
@@ -27,235 +25,201 @@ export interface Exercise {
   title: string;
   /** Index into LEVELS. */
   level: number;
-  focus: "rhythm" | "left hand" | "right hand" | "changes";
+  focus: "left hand" | "right hand";
   /** What to actually do, in coaching words. */
   coaching: string;
   /** When to consider it learned and move on. */
   goal: string;
-  kind: "strum" | "pick" | "notes";
-  /** Strum drills load into the practice screen. */
-  pattern?: Pattern;
-  /** Technique drills play inline on the song machinery. */
-  song?: Song;
-  /** Listening games: play each target at your own pace; the mic confirms. */
-  notes?: NoteTarget[];
+  /** The targets, in order. Untimed — the mic confirms each. */
+  notes: NoteTarget[];
 }
 
 export const LEVELS = [
   "First sounds",
-  "Rhythm foundations",
-  "Left hand",
+  "One finger",
+  "Two fingers",
+  "Three and four",
   "Right hand",
-  "Speed and polish",
 ] as const;
 
-const style = (id: string) => STRUM_STYLES.find((s) => s.id === id)!;
-
-/** A two-bar looping drill dressed as a Song for the player. */
-function drillSong(
-  id: string, title: string, bpm: number, chordId: string, bars: (PickStep | null)[][],
-): Song {
-  return {
-    id, title, artist: "Exercise", bpm,
-    slotsPerBar: 8, beatsPerBar: 4,
-    chordIds: [chordId],
-    strumStyleId: "downs",
-    note: "",
-    sections: [{ name: "Loop", bars: bars.map((picking): SongBar => ({ chordId, picking })) }],
-  };
-}
-
-const rest = null;
+/** Shorthand: a target on `string` at `fret`, named. */
+const n = (string: number, fret: number, name: string): NoteTarget => ({ string, fret, name });
 
 export const EXERCISES: Exercise[] = [
   // ---- Level 0: First sounds ---------------------------------------------
   {
-    id: "first-downstrokes",
-    title: "Single downstrokes",
-    level: 0, focus: "rhythm", kind: "strum",
-    coaching:
-      "Hold Em — two fingers, all six strings — and strum down on each click. Nothing else. Let the wrist fall through the strings rather than pushing them.",
-    goal: "Sixteen downstrokes in a row that land on the click and ring clean.",
-    pattern: { ...buildChordDrill(style("downs"), "Em"), bpm: 60 },
-  },
-  {
-    id: "one-string-at-a-time",
-    title: "One string at a time",
-    level: 0, focus: "right hand", kind: "pick",
-    coaching:
-      "Still on Em. Pick each string on its own, low to high and back down. Slowly. You are teaching your hand where the strings live without looking.",
-    goal: "A full climb and descent without hitting a neighbouring string.",
-    song: drillSong("one-string-at-a-time", "One string at a time", 60, "Em", [
-      [{ string: 0 }, rest, { string: 1 }, rest, { string: 2 }, rest, { string: 3 }, rest],
-      [{ string: 4 }, rest, { string: 5 }, rest, { string: 4 }, rest, { string: 3 }, rest],
-      [{ string: 2 }, rest, { string: 1 }, rest, { string: 0 }, rest, rest, rest],
-    ]),
-  },
-
-  {
     id: "open-strings",
     title: "Name the open strings",
-    level: 0, focus: "right hand", kind: "notes",
+    level: 0, focus: "right hand",
     coaching:
-      "The game shows a string; you play it open and let it ring. No timer, no rush — the microphone confirms each one and moves you on. E-A-D-G-B-E is the alphabet everything else is written in.",
-    goal: "All six strings, twice through, without looking at your pick hand.",
+      "The game shows a string; you play it open and let it ring. No timer, no rush. E-A-D-G-B-E is the alphabet everything else is written in.",
+    goal: "All six strings, up and back down, without looking at your pick hand.",
     notes: [
-      { string: 0, fret: 0, name: "E" }, { string: 1, fret: 0, name: "A" },
-      { string: 2, fret: 0, name: "D" }, { string: 3, fret: 0, name: "G" },
-      { string: 4, fret: 0, name: "B" }, { string: 5, fret: 0, name: "E" },
-      { string: 5, fret: 0, name: "E" }, { string: 4, fret: 0, name: "B" },
-      { string: 3, fret: 0, name: "G" }, { string: 2, fret: 0, name: "D" },
-      { string: 1, fret: 0, name: "A" }, { string: 0, fret: 0, name: "E" },
+      n(0, 0, "E"), n(1, 0, "A"), n(2, 0, "D"), n(3, 0, "G"), n(4, 0, "B"), n(5, 0, "E"),
+      n(5, 0, "E"), n(4, 0, "B"), n(3, 0, "G"), n(2, 0, "D"), n(1, 0, "A"), n(0, 0, "E"),
+    ],
+  },
+  {
+    id: "string-shuffle",
+    title: "Strings, shuffled",
+    level: 0, focus: "right hand",
+    coaching:
+      "Same six strings, dealt out of order. The moment this feels easy, your pick hand has learned the map.",
+    goal: "The whole shuffle without brushing a neighbouring string.",
+    notes: [
+      n(2, 0, "D"), n(4, 0, "B"), n(1, 0, "A"), n(5, 0, "E"),
+      n(3, 0, "G"), n(0, 0, "E"), n(4, 0, "B"), n(2, 0, "D"), n(1, 0, "A"), n(3, 0, "G"),
     ],
   },
 
-  // ---- Level 1: Rhythm foundations ---------------------------------------
+  // ---- Level 1: One finger ------------------------------------------------
   {
-    id: "down-up-eighths",
-    title: "Down and up",
-    level: 1, focus: "rhythm", kind: "strum",
+    id: "index-first-frets",
+    title: "Index finger, every string",
+    level: 1, focus: "left hand",
     coaching:
-      "Down on the numbers, up on the ands, and the hand never stops swinging. The up-strum catches fewer strings — that is correct, not a mistake.",
-    goal: "A minute of eighths with the mic reading mostly on time.",
-    pattern: { ...buildChordDrill(style("eighths"), "Am"), bpm: 70 },
+      "First fret, index finger, one string at a time. Press just behind the fret wire, not on top of it — clean notes come from position, not force.",
+    goal: "Six clean notes with no buzz and no aching hand.",
+    notes: [
+      n(0, 1, "F"), n(1, 1, "A#"), n(2, 1, "D#"), n(3, 1, "G#"), n(4, 1, "C"), n(5, 1, "F"),
+    ],
   },
-  {
-    id: "first-change",
-    title: "The first chord change",
-    level: 1, focus: "changes", kind: "strum",
-    coaching:
-      "G for a bar, C for a bar, downstrokes only. The secret: start moving your fingers on the last up-swing of the bar, not when the new bar arrives.",
-    goal: "Eight changes without the first beat of the new bar arriving late.",
-    pattern: { ...buildPattern(style("downs"), ["G", "C"], "G to C"), bpm: 64 },
-  },
-  {
-    id: "folk-pattern",
-    title: "The one pattern",
-    level: 1, focus: "rhythm", kind: "strum",
-    coaching:
-      "D · DU · UDU. Miss the strings on the skipped beats but keep the arm moving — the motion is the metronome your body keeps.",
-    goal: "Play it on G without thinking about it while talking to someone.",
-    pattern: { ...buildChordDrill(style("folk"), "G"), bpm: 72 },
-  },
-
-  // ---- Level 2: Left hand -------------------------------------------------
-  {
-    id: "hammer-ons",
-    title: "Hammer-ons",
-    level: 2, focus: "left hand", kind: "pick",
-    coaching:
-      "Pick the open string, then bring a finger down hard enough that the new note sounds without picking again. It is a hammer — speed, not pressure.",
-    goal: "The hammered note as loud as the picked one, on every string pair.",
-    song: drillSong("hammer-ons", "Hammer-ons", 66, "Em", [
-      [{ string: 1, art: "hammer", fromFret: 0 }, rest, rest, rest, { string: 1, art: "hammer", fromFret: 0 }, rest, rest, rest],
-      [{ string: 2, art: "hammer", fromFret: 0 }, rest, rest, rest, { string: 2, art: "hammer", fromFret: 0 }, rest, rest, rest],
-    ]),
-  },
-  {
-    id: "pull-offs",
-    title: "Pull-offs",
-    level: 2, focus: "left hand", kind: "pick",
-    coaching:
-      "The mirror image: pick the fretted note, then flick the finger off sideways — slightly downward, plucking the string as it leaves — so the open string sounds.",
-    goal: "A clear open note with no re-pick, both strings, at tempo.",
-    song: drillSong("pull-offs", "Pull-offs", 66, "Em", [
-      [{ string: 1, art: "pull", fromFret: 0 }, rest, rest, rest, { string: 1, art: "pull", fromFret: 0 }, rest, rest, rest],
-      [{ string: 2, art: "pull", fromFret: 0 }, rest, rest, rest, { string: 2, art: "pull", fromFret: 0 }, rest, rest, rest],
-    ]),
-  },
-  {
-    id: "trill",
-    title: "Hammer and pull together",
-    level: 2, focus: "left hand", kind: "pick",
-    coaching:
-      "Pick once, hammer on, pull off — three notes for one pick. This is the trill, and it is the doorway to legato playing.",
-    goal: "Four clean cycles in a row without the volume dying away.",
-    song: drillSong("trill", "Hammer and pull together", 60, "Em", [
-      [{ string: 1, art: "hammer", fromFret: 0 }, rest, { string: 1, art: "pull", fromFret: 0 }, rest, { string: 1, art: "hammer", fromFret: 0 }, rest, { string: 1, art: "pull", fromFret: 0 }, rest],
-      [{ string: 2, art: "hammer", fromFret: 0 }, rest, { string: 2, art: "pull", fromFret: 0 }, rest, { string: 2, art: "hammer", fromFret: 0 }, rest, { string: 2, art: "pull", fromFret: 0 }, rest],
-    ]),
-  },
-
   {
     id: "notes-low-e",
     title: "Notes on the low E",
-    level: 2, focus: "left hand", kind: "notes",
+    level: 1, focus: "left hand",
     coaching:
-      "Fret the note the game asks for, pick it, let it ring until it registers. Your own pace. Knowing the low E string by name is how barre chords stop being guesswork.",
+      "Fret the note the game asks for, pick it, let it ring until it registers. Knowing the low E by name is how barre chords stop being guesswork.",
     goal: "F, G and A found without counting frets from the top.",
     notes: [
-      { string: 0, fret: 1, name: "F" }, { string: 0, fret: 3, name: "G" },
-      { string: 0, fret: 5, name: "A" }, { string: 0, fret: 3, name: "G" },
-      { string: 0, fret: 1, name: "F" }, { string: 0, fret: 5, name: "A" },
+      n(0, 1, "F"), n(0, 3, "G"), n(0, 5, "A"), n(0, 3, "G"), n(0, 1, "F"), n(0, 5, "A"),
     ],
   },
   {
     id: "notes-a-string",
     title: "Notes on the A string",
-    level: 2, focus: "left hand", kind: "notes",
+    level: 1, focus: "left hand",
     coaching:
       "Same game, next string up. C, D and E on the A string are the roots of half the barre chords you will ever play.",
     goal: "C, D and E found cold, in any order the game deals them.",
     notes: [
-      { string: 1, fret: 3, name: "C" }, { string: 1, fret: 5, name: "D" },
-      { string: 1, fret: 7, name: "E" }, { string: 1, fret: 5, name: "D" },
-      { string: 1, fret: 3, name: "C" }, { string: 1, fret: 7, name: "E" },
+      n(1, 3, "C"), n(1, 5, "D"), n(1, 7, "E"), n(1, 5, "D"), n(1, 3, "C"), n(1, 7, "E"),
     ],
   },
 
-  // ---- Level 3: Right hand ------------------------------------------------
+  // ---- Level 2: Two fingers -----------------------------------------------
   {
-    id: "thumb-bass",
-    title: "Steady thumb",
-    level: 3, focus: "right hand", kind: "pick",
+    id: "one-two-walk",
+    title: "One-two walk",
+    level: 2, focus: "left hand",
     coaching:
-      "On Am, the thumb alternates between the two lowest sounding strings on every beat. Everything in fingerstyle is built over this heartbeat.",
-    goal: "The thumb keeps going while you hold a conversation — genuinely automatic.",
-    song: drillSong("thumb-bass", "Steady thumb", 66, "Am", [
-      [{ string: 1 }, rest, { string: 3 }, rest, { string: 1 }, rest, { string: 3 }, rest],
-      [{ string: 1 }, rest, { string: 3 }, rest, { string: 1 }, rest, { string: 3 }, rest],
-    ]),
+      "Index on fret one, middle on fret two, walking up three strings and back. Keep the index down while the middle lands — fingers that lift too early are the enemy of speed.",
+    goal: "Up and down with both fingers staying close to the strings.",
+    notes: [
+      n(0, 1, "F"), n(0, 2, "F#"), n(1, 1, "A#"), n(1, 2, "B"), n(2, 1, "D#"), n(2, 2, "E"),
+      n(2, 1, "D#"), n(1, 2, "B"), n(1, 1, "A#"), n(0, 2, "F#"), n(0, 1, "F"),
+    ],
+  },
+  {
+    id: "hammer-arrivals",
+    title: "Hammer-ons",
+    level: 2, focus: "left hand",
+    coaching:
+      "Pick the open string, then hammer a finger onto fret two hard enough that the new note sounds without picking again. The game listens for where you land — if the hammered note registers, it was loud enough.",
+    goal: "Every arrival as loud as the picked note that launched it.",
+    notes: [
+      n(1, 2, "B"), n(2, 2, "E"), n(3, 2, "A"),
+      n(1, 2, "B"), n(2, 2, "E"), n(3, 2, "A"),
+    ],
+  },
+  {
+    id: "pull-arrivals",
+    title: "Pull-offs",
+    level: 2, focus: "left hand",
+    coaching:
+      "The mirror image: fret two, pick, then flick the finger off sideways so the open string sounds without a fresh pick. The game listens for the open note you land on.",
+    goal: "A clear open-string arrival on all three strings, no re-pick.",
+    notes: [
+      n(1, 0, "A"), n(2, 0, "D"), n(3, 0, "G"),
+      n(1, 0, "A"), n(2, 0, "D"), n(3, 0, "G"),
+    ],
+  },
+
+  // ---- Level 3: Three and four fingers ------------------------------------
+  {
+    id: "one-two-three",
+    title: "One-two-three",
+    level: 3, focus: "left hand",
+    coaching:
+      "Index, middle, ring — frets one, two, three — up two strings and back. The ring finger is the weak one; let it be slow before you let it be sloppy.",
+    goal: "Both strings climbed and descended with every note ringing.",
+    notes: [
+      n(0, 1, "F"), n(0, 2, "F#"), n(0, 3, "G"),
+      n(1, 1, "A#"), n(1, 2, "B"), n(1, 3, "C"),
+      n(1, 2, "B"), n(1, 1, "A#"), n(0, 3, "G"), n(0, 2, "F#"), n(0, 1, "F"),
+    ],
+  },
+  {
+    id: "chromatic-four",
+    title: "The chromatic four",
+    level: 3, focus: "left hand",
+    coaching:
+      "One finger per fret: index to pinky, frets one to four. This is the exercise every guitarist does forever — the pinky only joins the band if you invite it every day.",
+    goal: "The pinky's note as strong as the index's, both strings.",
+    notes: [
+      n(0, 1, "F"), n(0, 2, "F#"), n(0, 3, "G"), n(0, 4, "G#"),
+      n(1, 1, "A#"), n(1, 2, "B"), n(1, 3, "C"), n(1, 4, "C#"),
+    ],
+  },
+  {
+    id: "spider-1324",
+    title: "The spider",
+    level: 3, focus: "left hand",
+    coaching:
+      "Same four frets, scrambled: one, three, two, four. Your fingers want to move in order; this teaches them to move on demand. Slow is the whole point.",
+    goal: "The 1-3-2-4 pattern clean on both strings without pausing to think.",
+    notes: [
+      n(0, 1, "F"), n(0, 3, "G"), n(0, 2, "F#"), n(0, 4, "G#"),
+      n(1, 1, "A#"), n(1, 3, "C"), n(1, 2, "B"), n(1, 4, "C#"),
+    ],
+  },
+
+  // ---- Level 4: Right hand ------------------------------------------------
+  {
+    id: "steady-thumb",
+    title: "Steady thumb",
+    level: 4, focus: "right hand",
+    coaching:
+      "Thumb only, alternating between the A and G strings. Everything in fingerstyle is built over this heartbeat — the fingers decorate, the thumb keeps time.",
+    goal: "Eight alternations without watching your hand.",
+    notes: [
+      n(1, 0, "A"), n(3, 0, "G"), n(1, 0, "A"), n(3, 0, "G"),
+      n(1, 0, "A"), n(3, 0, "G"), n(1, 0, "A"), n(3, 0, "G"),
+    ],
   },
   {
     id: "pima-roll",
-    title: "The full roll",
-    level: 3, focus: "right hand", kind: "pick",
+    title: "The p-i-m-a roll",
+    level: 4, focus: "right hand",
     coaching:
-      "Thumb, index, middle, ring — one string each, low to high, one finger per string, always the same finger on the same string. The roll behind half of fingerstyle.",
+      "Thumb, index, middle, ring — one string each, low to high and back. Always the same finger on the same string; the roll behind half of fingerstyle.",
     goal: "An even roll where no note is louder than its neighbours.",
-    song: drillSong("pima-roll", "The full roll", 72, "Am", [
-      [{ string: 1 }, { string: 3 }, { string: 4 }, { string: 5 }, { string: 4 }, { string: 3 }, { string: 1 }, rest],
-      [{ string: 1 }, { string: 3 }, { string: 4 }, { string: 5 }, { string: 4 }, { string: 3 }, { string: 1 }, rest],
-    ]),
+    notes: [
+      n(1, 0, "A"), n(3, 0, "G"), n(4, 0, "B"), n(5, 0, "E"),
+      n(4, 0, "B"), n(3, 0, "G"), n(1, 0, "A"),
+      n(3, 0, "G"), n(4, 0, "B"), n(5, 0, "E"),
+    ],
   },
   {
-    id: "muted-chucks",
-    title: "Muted chucks",
-    level: 3, focus: "rhythm", kind: "strum",
+    id: "string-skips",
+    title: "String skips",
+    level: 4, focus: "right hand",
     coaching:
-      "On beats 2 and 4, land the side of your strumming hand on the strings as you strike — a drum hit instead of a chord. That percussive slap is the backbeat.",
-    goal: "The chuck lands exactly with the click, chords ringing either side of it.",
-    pattern: { ...buildChordDrill(style("chuck"), "Am"), bpm: 76 },
-  },
-
-  // ---- Level 4: Speed and polish -----------------------------------------
-  {
-    id: "change-sprint",
-    title: "The change sprint",
-    level: 4, focus: "changes", kind: "strum",
-    coaching:
-      "G, D, Em, C — one bar each, the folk pattern throughout. When a pass is clean, nudge the tempo up five. When it falls apart, drop ten and rebuild.",
-    goal: "The full cycle clean at 90, three times in a row.",
-    pattern: { ...buildPattern(style("folk"), ["G", "D", "Em", "C"], "Change sprint"), bpm: 70 },
-  },
-  {
-    id: "barre-endurance",
-    title: "Barre endurance",
-    level: 4, focus: "left hand", kind: "strum",
-    coaching:
-      "F for a bar, C for a bar. The rest bar is the point: releasing and re-forming the barre is harder than holding it, and it is what songs actually demand.",
-    goal: "Sixteen F bars across a session without the last ones buzzing.",
-    pattern: { ...buildPattern(style("downs"), ["F", "C"], "Barre endurance"), bpm: 62 },
+      "Non-adjacent strings, on purpose. Skipping cleanly is what separates aiming from hoping.",
+    goal: "Every skip lands its string first time.",
+    notes: [
+      n(1, 0, "A"), n(4, 0, "B"), n(2, 0, "D"), n(5, 0, "E"), n(0, 0, "E"), n(3, 0, "G"),
+    ],
   },
 ];
 

@@ -5,9 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { ChromeText } from "../ui/ChromeText";
 import { MotifField } from "../ui/MotifField";
 import { Nav } from "../ui/Nav";
+import { appStore } from "@/lib/storage/settings";
 import { ChordsTab } from "./ChordsTab";
 import { PatternsTab } from "./PatternsTab";
-import { ExercisesTab } from "./ExercisesTab";
 
 /**
  * One place to learn from: chords, patterns, exercises. Three tabs instead of
@@ -28,11 +28,6 @@ const TABS = [
     id: "patterns",
     label: "Patterns",
     blurb: "Your strumming patterns. Filter them, hear them, take one to the metronome.",
-  },
-  {
-    id: "exercises",
-    label: "Exercises",
-    blurb: "A graded path — first sounds to speed work. Drills, technique, and listening games.",
   },
 ] as const;
 
@@ -67,6 +62,7 @@ function LearnInner() {
           tell what lives behind each before committing a tap. */}
       <div className="px-4 pb-4 sm:px-8">
         <div className="wrap grid gap-2 sm:grid-cols-3" role="tablist" aria-label="Learn sections">
+          {/* Exercises moved to the play screen — this tile is the signpost. */}
           {TABS.map((t) => {
             const active = tab === t.id;
             return (
@@ -92,12 +88,26 @@ function LearnInner() {
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={() => {
+              appStore.set((prev) => ({ ...prev, mode: "exercise" }));
+              router.push("/play");
+            }}
+            className="rounded-2xl border p-4 text-left transition"
+            style={{ borderColor: "var(--line)" }}
+          >
+            <span className="font-display block text-xl leading-tight text-fg">Exercises</span>
+            <span className="mt-1 block text-xs leading-relaxed text-fg-dim">
+              Technique games, graded finger by finger — on the play screen. →
+            </span>
+          </button>
         </div>
       </div>
 
       <section className="block-light px-4 py-6 sm:px-8">
         <div className="wrap">
-          {tab === "chords" ? <ChordsTab /> : tab === "patterns" ? <PatternsTab /> : <ExercisesTab />}
+          {tab === "chords" ? <ChordsTab /> : <PatternsTab />}
         </div>
       </section>
     </main>

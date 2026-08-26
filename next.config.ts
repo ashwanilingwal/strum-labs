@@ -8,6 +8,7 @@ const nextConfig: NextConfig = {
     return [
       { source: "/chords", destination: "/learn?tab=chords", permanent: false },
       { source: "/patterns", destination: "/learn?tab=patterns", permanent: false },
+      { source: "/game", destination: "/play", permanent: false },
     ];
   },
 

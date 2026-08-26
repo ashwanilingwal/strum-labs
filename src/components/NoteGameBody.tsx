@@ -1,23 +1,15 @@
 "use client";
 
-import { Suspense, useMemo } from "react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
 import { useNoteGame } from "@/hooks/useNoteGame";
-import { EXERCISES, type Exercise, type NoteTarget } from "@/lib/music/exercises";
+import { type Exercise, type NoteTarget } from "@/lib/music/exercises";
 import type { Chord } from "@/lib/music/chords";
-import { ChordChart } from "../chart/ChordChart";
-import { ChromeText } from "../ui/ChromeText";
-import { Nav } from "../ui/Nav";
+import { ChordChart } from "./chart/ChordChart";
+import { ChromeText } from "./ui/ChromeText";
 
 /**
- * The listening game. Untimed on principle: the metronome side of the app owns
- * "when", this side owns "where". You play the shown note at whatever pace
- * your hands allow; the microphone confirms and deals the next.
- *
- * `NoteGameBody` is host-agnostic — the /game page wraps it in page chrome and
- * the exercise overlay embeds it directly, so practising never has to leave
- * the list screen.
+ * The listening game, host-agnostic. Untimed on principle: the metronome side
+ * of the app owns "when", this side owns "where" — you play the shown note at
+ * whatever pace your hands allow; the microphone confirms and deals the next.
  */
 
 /** A one-note "chord" so the chart can draw a single finger position. */
@@ -127,57 +119,3 @@ export function NoteGameBody({ exercise }: { exercise: Exercise }) {
   );
 }
 
-function GameInner() {
-  const params = useSearchParams();
-  const id = params.get("id");
-  const exercise: Exercise | undefined = EXERCISES.find((e) => e.id === id && e.kind === "notes");
-
-  const nextExercise = useMemo(() => {
-    if (!exercise) return undefined;
-    const i = EXERCISES.indexOf(exercise);
-    return EXERCISES[i + 1];
-  }, [exercise]);
-
-  if (!exercise) {
-    return (
-      <main className="block-dark min-h-dvh">
-        <Nav />
-        <div className="wrap px-4 py-16 text-center sm:px-8">
-          <p className="text-fg-muted">That game doesn&rsquo;t exist.</p>
-          <Link href="/learn?tab=exercises" className="btn btn-lit mt-4 inline-flex">Back to exercises</Link>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main className="block-dark flex min-h-dvh flex-col">
-      <Nav />
-      <section className="relative flex-1 px-4 py-4 sm:px-8">
-        <div className="wrap">
-          <p className="caps text-fg-dim">{exercise.title}</p>
-          <div className="mt-2">
-            <NoteGameBody key={exercise.id} exercise={exercise} />
-          </div>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <Link href="/learn?tab=exercises" className="btn">All exercises</Link>
-            {nextExercise?.kind === "notes" ? (
-              <Link href={`/game?id=${nextExercise.id}`} className="btn">
-                Next: {nextExercise.title}
-              </Link>
-            ) : null}
-          </div>
-          <p className="mt-4 max-w-xl text-xs leading-relaxed text-fg-dim">{exercise.coaching}</p>
-        </div>
-      </section>
-    </main>
-  );
-}
-
-export function NoteGame() {
-  return (
-    <Suspense>
-      <GameInner />
-    </Suspense>
-  );
-}

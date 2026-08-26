@@ -44,8 +44,8 @@ export interface ListenSettings {
   duckMode: DuckMode;
 }
 
-/** Practising one chord, or a progression. Picks which selector the UI shows. */
-export type PracticeMode = "chord" | "pattern";
+/** One chord, a progression, or the technique games. */
+export type PracticeMode = "chord" | "pattern" | "exercise";
 
 /**
  * Quick picks are written into one reserved pattern rather than appended.
@@ -135,7 +135,8 @@ export function reviveState(raw: unknown): AppState {
     : base.patterns;
 
   const pick = { ...base.pick, ...(r.pick ?? {}) };
-  const mode: PracticeMode = r.mode === "pattern" ? "pattern" : "chord";
+  const mode: PracticeMode =
+    r.mode === "pattern" ? "pattern" : r.mode === "exercise" ? "exercise" : "chord";
 
   // The reserved slot must always exist — stored state from before it did, or
   // one where it was deleted, would otherwise leave the selectors pointing at

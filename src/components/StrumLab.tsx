@@ -12,6 +12,7 @@ import { ChordChart } from "./chart/ChordChart";
 import { ChordSequence } from "./chart/ChordSequence";
 import { LiveFeedback } from "./LiveFeedback";
 import { ChordSheet } from "./ChordSheet";
+import { ExerciseMode } from "./ExerciseMode";
 import { ModeToggle } from "./ModeToggle";
 import { SessionSummary } from "./SessionSummary";
 import { SettingsPanel } from "./SettingsPanel";
@@ -106,6 +107,7 @@ export function StrumLab() {
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      if (appStore.get().mode === "exercise") return;
       if (e.code === "Space") {
         e.preventDefault();
         engine.toggle();
@@ -126,12 +128,16 @@ export function StrumLab() {
 
   const setMode = useCallback(
     (mode: PracticeMode) => {
-      setState((prev) => ({
-        ...prev,
-        mode,
-        activeId: QUICK_ID,
-        patterns: prev.patterns.map((p) => (p.id === QUICK_ID ? quickPattern(mode, prev.pick) : p)),
-      }));
+      setState((prev) => {
+        // Exercise mode has no quick pattern to rebuild — it is games only.
+        if (mode === "exercise") return { ...prev, mode };
+        return {
+          ...prev,
+          mode,
+          activeId: QUICK_ID,
+          patterns: prev.patterns.map((p) => (p.id === QUICK_ID ? quickPattern(mode, prev.pick) : p)),
+        };
+      });
     },
     [setState],
   );
@@ -198,6 +204,10 @@ export function StrumLab() {
           />
         </div>
       </div>
+      {state.mode === "exercise" ? (
+        <ExerciseMode />
+      ) : (
+      <>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
         {/*
           Auto margins rather than `justify-center` on the scroller: they centre
@@ -401,6 +411,8 @@ export function StrumLab() {
         />
         </div>
       </div>
+      </>
+      )}
 
       {chordSheetBar !== null ? (
         <ChordSheet

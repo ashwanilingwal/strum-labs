@@ -25,6 +25,8 @@ export function PracticePicker({
 }) {
   const apply = (patch: Partial<AppState["pick"]>, mode: PracticeMode = state.mode) => {
     setState((prev) => {
+      // Exercise mode carries no quick pattern — it is games only.
+      if (mode === "exercise") return { ...prev, mode };
       const pick = { ...prev.pick, ...patch };
       const built = quickPattern(mode, pick);
       return {
@@ -41,7 +43,12 @@ export function PracticePicker({
     <div className="space-y-3 px-3 py-2">
       <ModeToggle mode={state.mode} onChange={(m) => apply({}, m)} showHints />
 
-      {state.mode === "chord" ? (
+      {state.mode === "exercise" ? (
+        <p className="px-1 py-2 text-xs leading-relaxed text-fg-dim">
+          Exercise mode is the graded technique games — everything is picked on
+          the play screen itself, so there is nothing to set up here.
+        </p>
+      ) : state.mode === "chord" ? (
         <div>
           <p className="caps mb-1.5 text-fg-dim">Chord</p>
           {CHORD_TIERS.map((tier) => {
@@ -97,6 +104,7 @@ export function PracticePicker({
         </div>
       )}
 
+      {state.mode !== "exercise" ? (
       <div>
         <p className="caps mb-1.5 text-fg-dim">Strumming</p>
         <div className="space-y-1.5">
@@ -123,6 +131,8 @@ export function PracticePicker({
           })}
         </div>
       </div>
+
+      ) : null}
 
       {state.mode === "pattern" ? (
         <div className="pt-1">
