@@ -104,7 +104,7 @@ export function SongPlayer({ song }: { song: Song }) {
           </header>
 
           {/* The six chords. The active one carries the animated overlay. */}
-          <div className="mt-6 grid grid-cols-3 gap-3 sm:grid-cols-6">
+          <div className="mt-6 grid grid-cols-4 gap-3 sm:grid-cols-7">
             {song.chordIds.map((id) => {
               const chord = chordById(id);
               if (!chord) return null;
@@ -129,7 +129,7 @@ export function SongPlayer({ song }: { song: Song }) {
           {/* Progress: sections and bars. */}
           <div className="mt-6 space-y-3">
             {sections.map((section) => (
-              <div key={section.name}>
+              <div key={section.startIndex}>
                 <p className="caps mb-1.5 text-fg-dim">{section.name}</p>
                 <ol className="flex flex-wrap gap-1.5">
                   {section.bars.map((b, i) => {
@@ -160,7 +160,7 @@ export function SongPlayer({ song }: { song: Song }) {
       </section>
 
       {/* Transport */}
-      <div className="shrink-0 border-t border-line bg-ink/95 px-4 py-3 sm:px-8">
+      <div className="sticky bottom-0 z-20 shrink-0 border-t border-line bg-ink/95 px-4 py-3 backdrop-blur sm:px-8">
         <div className="wrap flex flex-wrap items-center gap-3">
           <button
             type="button"

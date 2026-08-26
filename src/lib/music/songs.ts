@@ -96,6 +96,51 @@ function arp(a: number, b: number, c: number, d: number): (PickStep | null)[] {
 
 const bar = (chordId: string, picking: (PickStep | null)[]): SongBar => ({ chordId, picking });
 
+/**
+ * Shared verse cycle for Every Breath You Take — the progression the whole
+ * song orbits. Fresh helper per call keeps every bar its own object.
+ */
+const ebytVerse = (): SongBar[] => [
+  bar("A", arp(1, 3, 4, 5)),
+  // The add9 colour the song is famous for, taught as a mechanic: the hammer
+  // lands on the B string mid-bar without a fresh pick.
+  bar("A", [
+    { string: 1 }, { string: 3 }, { string: 4, art: "hammer", fromFret: 0 }, { string: 5 },
+    { string: 4 }, { string: 3 }, { string: 4 }, { string: 3 },
+  ]),
+  bar("F#m", arp(0, 3, 4, 5)),
+  bar("F#m", arp(0, 3, 4, 5)),
+  bar("D", arp(2, 3, 4, 5)),
+  bar("E", [
+    { string: 0 }, { string: 2 }, { string: 3, art: "pull", fromFret: 0 }, { string: 4 },
+    { string: 3 }, { string: 2 }, { string: 3 }, { string: 2 },
+  ]),
+  bar("A", arp(1, 3, 4, 5)),
+  bar("A", arp(1, 3, 4, 5)),
+];
+
+const ebytChorus = (): SongBar[] => [
+  bar("D", arp(2, 3, 4, 5)),
+  bar("D", arp(2, 3, 4, 5)),
+  bar("A", arp(1, 3, 4, 5)),
+  bar("A", arp(1, 3, 4, 5)),
+  bar("B7", arp(1, 3, 4, 5)),
+  bar("B7", arp(1, 3, 4, 5)),
+  bar("E", arp(0, 2, 3, 4)),
+  bar("E", arp(0, 2, 3, 4)),
+];
+
+const ebytMiddle = (): SongBar[] => [
+  bar("F", arp(0, 3, 4, 5)),
+  bar("F", arp(0, 3, 4, 5)),
+  bar("G", arp(0, 3, 4, 5)),
+  bar("G", arp(0, 3, 4, 5)),
+  bar("F", arp(0, 3, 4, 5)),
+  bar("F", arp(0, 3, 4, 5)),
+  bar("E", arp(0, 2, 3, 4)),
+  bar("E", arp(0, 2, 3, 4)),
+];
+
 export const SONGS: Song[] = [
   {
     id: "every-breath-you-take",
@@ -104,45 +149,20 @@ export const SONGS: Song[] = [
     bpm: 114,
     slotsPerBar: 8,
     beatsPerBar: 4,
-    chordIds: ["A", "F#m", "D", "E", "F", "G"],
+    chordIds: ["A", "F#m", "D", "E", "B7", "F", "G"],
     strumStyleId: "eighths",
     note:
-      "The record sits a half-step down — tune every string down one fret to match it, or play as written and be your own key. The picking here is a practice arrangement over the song's chords, not a transcription of the recorded riff.",
+      "The record sits a half-step down — tune every string down one fret to match it, or play as written and be your own key. Charts often write a plain B in the chorus; B7 is the friendly open-shape substitute and sits fine. The picking is a practice arrangement over the song's chords, not a transcription of the recorded riff.",
     sections: [
-      {
-        name: "Verse",
-        bars: [
-          bar("A", arp(1, 3, 4, 5)),
-          // The add9 colour the song is famous for, taught as a mechanic: the
-          // hammer lands on the B string mid-bar without a fresh pick.
-          bar("A", [
-            { string: 1 }, { string: 3 }, { string: 4, art: "hammer", fromFret: 0 }, { string: 5 },
-            { string: 4 }, { string: 3 }, { string: 4 }, { string: 3 },
-          ]),
-          bar("F#m", arp(0, 3, 4, 5)),
-          bar("F#m", arp(0, 3, 4, 5)),
-          bar("D", arp(2, 3, 4, 5)),
-          bar("E", [
-            { string: 0 }, { string: 2 }, { string: 3, art: "pull", fromFret: 0 }, { string: 4 },
-            { string: 3 }, { string: 2 }, { string: 3 }, { string: 2 },
-          ]),
-          bar("A", arp(1, 3, 4, 5)),
-          bar("A", arp(1, 3, 4, 5)),
-        ],
-      },
-      {
-        name: "Middle eight",
-        bars: [
-          bar("F", arp(0, 3, 4, 5)),
-          bar("F", arp(0, 3, 4, 5)),
-          bar("G", arp(0, 3, 4, 5)),
-          bar("G", arp(0, 3, 4, 5)),
-          bar("F", arp(0, 3, 4, 5)),
-          bar("F", arp(0, 3, 4, 5)),
-          bar("E", arp(0, 2, 3, 4)),
-          bar("E", arp(0, 2, 3, 4)),
-        ],
-      },
+      { name: "Intro", bars: ebytVerse() },
+      { name: "Verse 1", bars: ebytVerse() },
+      { name: "Chorus", bars: ebytChorus() },
+      { name: "Verse 2", bars: ebytVerse() },
+      { name: "Chorus", bars: ebytChorus() },
+      { name: "Middle eight", bars: ebytMiddle() },
+      { name: "Interlude", bars: ebytVerse() },
+      { name: "Middle eight", bars: ebytMiddle() },
+      { name: "Outro", bars: ebytVerse() },
     ],
   },
 ];
