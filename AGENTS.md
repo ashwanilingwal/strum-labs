@@ -10,125 +10,179 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 # StrumLab
 
-Four routes:
+A browser guitar trainer: build strumming patterns, drill them against a
+metronome that listens back through the microphone, tune, play songs, and run
+graded technique games. Everything runs client-side; there is no backend
+except optional Supabase sync.
 
-| Route | What it is |
-| --- | --- |
-| `/` | Cover. One wordmark, one sentence, one way in. It does nothing else on purpose. |
-| `/play` | The practice screen — chords, metronome, audio, settings. |
-| `/learn` | Chords and patterns as tabs (`?tab=`). `/chords` and `/patterns` redirect here; the Exercises tile signposts to the play screen. |
-| `/tuner` | Tuner. Its own DSP — see below. |
-| `/songs` | Follow-along song player: fingerpick or strum, live pace control. |
+This file is the map. It is written so a fresh session can make a surgical
+change without reading the rest of the tree or any prior conversation. If you
+change the architecture, change this file in the same commit.
 
-The design is **flat editorial**: full-width blocks alternating black and lilac,
-inflated chrome type, flower confetti, tiny wide-tracked caps. There is no
-skeuomorphism left — the chrome bezels, gloss gradients and the turntable were
-removed deliberately.
+## Routes
+
+| Route | What it is | Component |
+| --- | --- | --- |
+| `/` | Cover — wordmark, one sentence, one button, legal link | `app/page.tsx` |
+| `/play` | The practice screen. Three modes: Chords, Patterns, Exercises | `components/StrumLab.tsx` |
+| `/learn` | Chord library + saved patterns as tabs (`?tab=`) | `components/learn/Learn.tsx` |
+| `/songs` | Follow-along song player, fingerpick or strum, live pace | `components/SongPlayer.tsx` |
+| `/tuner` | Tuner (its own time-domain DSP) | `components/Tuner.tsx` |
+| `/legal` | Every licensing position in plain words | `app/legal/page.tsx` |
+| `/soundcheck` | Hidden: measures the master bus. Run after audio changes | `app/soundcheck/page.tsx` |
+| `/auth/callback` | Supabase OAuth landing (only server-rendered route) | `app/auth/callback/route.ts` |
+
+Redirects (next.config.ts): `/chords` and `/patterns` → `/learn` tabs;
+`/game` → `/play`.
+
+## Layering — what may import what
+
+```
+lib/music     pure data + maths (chords, patterns, songs, exercises, tuning, theory)
+lib/listen    pure DSP (fft, dsp, pitch, noteGame) + mic capture (mic.ts only file touching Web Audio here)
+lib/feedback  how verdicts look/read — pure
+lib/storage   localStorage store + revive + supabase sync — no React
+lib/audio     Web Audio: engine (synth+graph), sampler, transport, perform, preview
+hooks/        React ↔ engines: useStrumEngine, useSongEngine, useTuner, useNoteGame, useAccount
+components/   React UI only. No timing decisions, no DSP, no literal colours.
+```
+
+Rules: `lib/music`, `lib/listen` (except mic.ts), `lib/feedback` import no
+React and no Web Audio — they are testable with synthetic input, and every
+detector threshold here was tuned by measuring, not guessing. Only `hooks/`
+and `components/` may import React. Data files are the extension points:
+
+| To add… | Edit only | Shows up in |
+| --- | --- | --- |
+| a chord | `lib/music/chords.ts` (one literal) | picker, library, matcher templates |
+| a strum style / progression | `lib/music/library.ts` | practice picker (styles × progressions compose) |
+| a pattern preset | `lib/music/pattern.ts` → `PRESET_SOURCE` | patterns tab |
+| a song | `lib/music/songs.ts` → `SONGS` | song player (chords are facts; no lyrics, no note-for-note transcriptions — see /legal) |
+| an exercise | `lib/music/exercises.ts` → `EXERCISES` | play screen's Exercises mode. ONE kind only: a listening game (`notes` targets, untimed). Add to its level, not the end |
+| a tuning | `lib/music/tuning.ts` → `TUNINGS` | tuner |
+| a sampled instrument | `scripts/build-samples.py <id> <dir>` + one entry in `lib/audio/samples/index.ts` | tone selects. Licence files must travel with the audio |
 
 ## Where to change what
 
-Find your row, open that file, stop. None of these require reading the rest.
-
+### Sound
 | To change | Open | Notes |
 | --- | --- | --- |
-| What a slot **sounds** like | `lib/audio/perform.ts` | One function. Fingerpicking, per-string plucks and drum sounds all go here. |
-| **When** things happen | `lib/audio/transport.ts` | Lookahead scheduler. Don't move timing into React. |
-| The **synth** itself | `lib/audio/engine.ts` | Karplus-Strong. `pluck`, `strum`, `click`. Also owns the audio graph and the duck node. |
-| **Sound diagnostics** | `/soundcheck` (hidden route) | Measures the master bus: every tone audible, loudness parity, clipping, mute paths, click scheduling. Run it after touching the audio graph. |
-| Bus **volume/duck glides** | `glide()` in `lib/audio/engine.ts` | Never use `setTargetAtTime` for control buses — it never lands and leaves a −23 dB ghost at "zero". Linear ramp only. |
-| Per-instrument **loudness** | `trim` in `lib/audio/samples/index.ts` | Measured values; keep abs peak < 0.9 at the bus. |
-| **Sampled** guitar playback | `lib/audio/sampler.ts` | Real recordings. Voice stealing lives here. |
-| Add a sampled **instrument** | `scripts/build-samples.py`, then `lib/audio/samples/index.ts` | Two steps, nothing else. Per-instrument note maps are generated — do not hand-edit. Non-FLAC sources are transcoded automatically. |
-| **Licensing** of the audio | `public/samples/<id>/SOURCE.txt` | Per-instrument, and it differs: the steel-string is GPL-3, the other two are CC0. Don't write one blanket statement. |
-| The **chord chart** | `components/chart/ChordChart.tsx` | Data-driven. Anything transient — sounding strings, picking fingers, damping, fret overrides — goes through `ChartOverlay` in `chart/types.ts`, not into the component. |
-| Several chords at once | `components/chart/ChordSequence.tsx` | `symbols` for a compact strip, `charts` for full boxes. |
-| Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
-| The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
-| Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
-| Add an **exercise** | `lib/music/exercises.ts` → `EXERCISES` | Data only, ONE kind: a listening game — `notes` targets, untimed, mic-confirmed. They live in the play screen's Exercises mode (`ExerciseMode.tsx` + `NoteGameBody.tsx`). Chord/pattern drills are not exercises — those worlds are the other two play modes. Add to the level it belongs to, not the end. |
-| The **note game** rules | `lib/listen/noteGame.ts` | Pure matcher — frames in, hit/progress out. Tolerance 60 cents (a finding game, not a tuning game), 4 steady frames to hit, 700ms post-hit deafness so the ringing string cannot claim the next target. Tested with synthetic frames. |
-| Add a **song** | `lib/music/songs.ts` → `SONGS` | Data only — sections of bars, each with a chord id and a picking array; hammer/pull as `art` on a step. No code changes, which is what makes MCP-driven additions possible later. Progressions are facts and shippable; note-for-note transcriptions of recordings are not — write practice arrangements and say so in the song's `note`. |
-| Add a **strum style** or **progression** | `lib/music/library.ts` | A style is one bar of strokes and tiles across any chord list; `buildPattern` multiplies the two. Adding one style gives every progression a new feel. |
-| What the player is practising | `mode` + `pick` in `lib/storage/settings.ts` | Selections write to the reserved `QUICK_ID` pattern, never to a saved one. |
-| How strums are **detected** | `lib/listen/detector.ts` | Thresholds live at the top as named constants. |
-| **Pitch** detection | `lib/listen/pitch.ts` | NSDF/McLeod, time domain. Do not try to reuse the onset FFT — 43 Hz bins cannot resolve cents at 82 Hz. Pure, so it can be checked against synthetic tones. |
-| Tunings, cents, string matching | `lib/music/tuning.ts` | |
-| Spectral **maths** | `lib/listen/dsp.ts`, `lib/listen/fft.ts` | Pure, no Web Audio, directly testable. |
-| **Mic setup** / permissions | `lib/listen/mic.ts` | Includes the AudioWorklet source. |
-| How a strum is **judged** | `lib/listen/scoring.ts` | `TIGHT_MS`, `CLOSE_MS`, latency offset, missed/extra, bleed rejection. |
-| How a verdict **looks or reads** | `lib/feedback/presentation.ts` | Colours, glyphs, wording, meter geometry. No component hardcodes these. Use `verdictVisual(grade, errorMs)` — it knows rushing from dragging; `gradeVisual(grade)` is for aggregates only. |
-| The **stop summary** | `components/SessionSummary.tsx` | Headline logic is in `verdictLine`. |
-| **Colours, type, every surface** | `:root` and `.block-light` in `globals.css` | Components name only semantic tokens (`--fg`, `--accent`, `--tight`). Re-skinning is this file alone. |
-| Dark vs light **ground** | add `.block-light` / `.block-dark` | Re-points the contextual tokens; children follow without knowing they moved. |
-| The **chrome lettering** | `.chrome-face` gradient in `globals.css`, `components/ui/ChromeText.tsx` | The hard mid-stops are what read as metal — a smooth ramp looks like plastic. |
-| **Confetti motifs** | `components/ui/MotifField.tsx` | Absolute, not fixed: blocks paint opaque, so a page-level layer behind them is invisible. Sections opt in with `relative` + `z-10` on their content. |
-| The **nav** | `components/ui/Nav.tsx` | The only chrome any page carries. |
-| **Theme** colours | `:root` in `globals.css` | Every surface is a token or a utility class. |
-| The **live feedback** UI | `components/LiveFeedback.tsx` | Big verdict + timing scatter. |
-| The **lane** | `components/StrumLane.tsx` | Playhead and per-slot verdicts. |
-| The **pattern builder** | `components/PatternEditor.tsx` | Lives inside the settings sheet, not its own page. |
-| **Persistence** | `lib/storage/settings.ts` | `reviveState` is the trust boundary for anything from disk or cloud. |
+| What a slot sounds like | `lib/audio/perform.ts` | One function; fingerpicking/drums land here |
+| When things happen | `lib/audio/transport.ts` | Lookahead scheduler; supports `fromSlot` for mid-song starts |
+| Synth / audio graph / duck | `lib/audio/engine.ts` | Karplus-Strong; `glide()` for all bus levels; limiter is the last node; `output` tap for diagnostics |
+| Sampled playback / voice stealing | `lib/audio/sampler.ts` | `trim` per instrument in `samples/index.ts`; keep abs peak < 0.9 at the bus |
+| One-shot previews (Learn) | `lib/audio/preview.ts` | Books all strums up front; `stopPreview()` |
+
+### Listening
+| To change | Open | Notes |
+| --- | --- | --- |
+| Mic setup | `lib/listen/mic.ts` | Worklet source inline; browser "enhancements" forced off |
+| Strum onset + chord guess | `lib/listen/detector.ts` | Thresholds are named constants at the top, each with its measured rationale |
+| Timing verdicts | `lib/listen/scoring.ts` | `TIGHT_MS`/`CLOSE_MS`, latency offset, bleed rejection |
+| Pitch (tuner, note game) | `lib/listen/pitch.ts` | NSDF, time-domain; the FFT's 43 Hz bins cannot do this job |
+| Note-game rules | `lib/listen/noteGame.ts` | Pure matcher: 60-cent tolerance, 4 steady frames, 700ms cooldown |
+| Verdict wording/colour | `lib/feedback/presentation.ts` | `verdictVisual(grade, errorMs)` knows early from late |
+
+### Screens
+| To change | Open |
+| --- | --- |
+| Play screen shell + mode switch | `components/StrumLab.tsx` |
+| Exercises mode (level rail + games) | `components/ExerciseMode.tsx`, `components/NoteGameBody.tsx`, `hooks/useNoteGame.ts` |
+| Lane / live feedback / summary | `components/StrumLane.tsx`, `LiveFeedback.tsx`, `SessionSummary.tsx` |
+| Transport bar | `components/TransportBar.tsx` |
+| Settings sheet | `components/SettingsPanel.tsx` (+ `PracticePicker`, `PatternEditor`, `ChordPicker`) |
+| Inline chord change | `components/ChordSheet.tsx` (edits one named bar, never "current") |
+| Learn tabs | `components/learn/*` (`goPractise.ts` hands things to /play via `QUICK_ID`) |
+| Song player | `components/SongPlayer.tsx`, `hooks/useSongEngine.ts` |
+| Tuner | `components/Tuner.tsx`, `hooks/useTuner.ts` |
+| Chord chart + overlays | `components/chart/` — transient state (sounding, pluck fingers, H/P arcs) goes through `ChartOverlay`, never into the chord data |
+
+### Theme
+Everything visual is semantic tokens in `app/globals.css` (`--fg`, `--accent`,
+`--tight`…). Components never name a colour. `.block-light`/`.block-dark`
+re-point the tokens for a whole subtree. The look is flat editorial in chrome
+and gunmetal — steel gradients, ice-blue accent, sparkle/orb confetti
+(`components/ui/MotifField.tsx`); the chrome lettering is `components/ui/ChromeText.tsx` (two stacked
+copies; the hard gradient mid-stops are what read as metal). Re-skinning the
+app is a one-file edit — it has survived two full palette swaps.
+
+### Storage
+`lib/storage/settings.ts` — `appStore` (localStorage via `useSyncExternalStore`),
+`reviveState` is the trust boundary for anything from disk or cloud, `QUICK_ID`
+is the reserved slot every picker writes to (never a saved pattern). Supabase
+is optional: without env vars the sign-in UI simply doesn't render.
 
 ## Invariants
 
 Break these and things fail in ways that are hard to trace back.
 
 1. **React never decides when a sound happens.** The transport books notes
-   against the `AudioContext` clock ahead of time; components are told after
-   the fact from a rAF loop. Anything scheduled from `setInterval` + `setState`
-   drifts audibly within bars.
-2. **Patterns are only mutated through `normalise()`.** It is what guarantees
-   `strokes.length === bars * slotsPerBar` and that `chords.length === bars`.
-   Nothing downstream defends against a ragged pattern.
-3. **`lib/music` and `lib/listen` import no React and no Web Audio.** They are
-   pure so they stay testable and reusable for progressions, songs and
-   fingerpicking. `lib/audio` may touch Web Audio; only `hooks/` and
-   `components/` may touch React.
-4. **Browser audio "enhancements" stay off.** `echoCancellation`,
-   `noiseSuppression` and `autoGainControl` are speech algorithms and actively
-   damage guitar analysis. See the comment in `lib/listen/mic.ts`.
-5. **Onset timestamps come from the worklet, never from the main thread.** They
-   are what makes "38 ms late" a true statement.
-6. **`slotsPerBar` is a field, not a constant.** The editor offers eighths, but
-   4/12/16 already work end to end. Don't hardcode 8.
-7. **Status never replaces content.** A prominent slot holds one kind of
-   thing. When detection drops out, keep the last value and dim it; put
-   liveness in a small pill at the side. The tuner used to swap its big string
-   letter for "listening" between plucks, and the play screen swapped the chord
-   for the count-in number — removing the shape you need exactly when you are
-   getting your fingers onto it.
-8. **Controls that would invalidate a take are locked while the transport
-   runs** — the mode toggle and the nav links. They explain why rather than
-   just going dead. The transport itself and chord changes stay live: you must
-   always be able to stop, and changing a chord mid-loop is a feature.
-9. **Never drive the UI loop from requestAnimationFrame.** rAF does not fire
-   while the page is hidden, backgrounded or throttled, but the transport keeps
-   scheduling on the audio clock — so the playhead freezes over a running
-   metronome and the app looks dead. `useStrumEngine` uses a 25ms interval.
-   Nothing there is per-frame animation.
-10. **Stepper buttons resolve against the store, not a render-time value.**
-   `setBpm(bpm + 1)` loses increments when clicks land faster than React
-   re-renders. Use `nudgeBpm(delta)`.
-11. **The play screen is an app shell, not a long page.** Fixed-height column:
-   nav, one scrolling region, transport in flow at the bottom. Do not make the
-   transport sticky again — that needs a spacer matching its height, and
-   measuring it depends on `resize` / `ResizeObserver`, which some embedded
-   browser contexts never fire. The bug is silent: the spacer stays zero and
-   the lane becomes unreachable.
-12. **Nothing is gated behind sign-in.** localStorage is the working copy;
-   an account only adds sync.
-13. **Check 320px before calling a layout done.** It is where the transport
-   wraps to three rows and where wide letter-spacing stops fitting.
-14. **One voice per string.** Samples ring for up to 5 seconds; without the
-   voice stealing in `sampler.ts` and `engine.ts`, a bar of eighths stacks ~48
-   simultaneous notes into mush. Re-striking a string must damp the last one.
-15. **Sampled tones fall back to the synth, never to silence.** A failed
-   download must not leave a practice tool with no sound.
-16. **The click never gets ducked with the guitar.** It sits outside
-   `guitarGain` in the audio graph on purpose — muting the guitar for the mic
-   must not take the metronome with it.
-17. **Store-backed UI on the Learn page renders client-only.** PatternsTab
-    gates on the `useHydrated` trick. Hydrating server HTML against
-    localStorage-backed state stalled the page's whole Suspense boundary —
-    silently: no console error, React simply never attached, and every control
-    on the page was dead. If a Learn tab reads `appStore`, gate it.
+   against the AudioContext clock ahead of time; the screen catches up from a
+   25ms interval that drains a queue.
+2. **Never drive a UI loop from requestAnimationFrame.** rAF stops in hidden
+   or throttled pages while the audio clock keeps going — a frozen playhead
+   over a running metronome looks exactly like a dead app.
+3. **Patterns are only mutated through `normalise()`.** Nothing downstream
+   defends against a ragged pattern.
+4. **Browser audio "enhancements" stay off** (`echoCancellation`,
+   `noiseSuppression`, `autoGainControl`) — they are speech algorithms and
+   measurably damage guitar analysis.
+5. **Onset timestamps come from the worklet, never the main thread.** They are
+   what makes "38 ms late" a true statement.
+6. **Never `setTargetAtTime` on a control bus** — it never reaches its target
+   and left a −23 dB ghost of the click at "zero" volume. `engine.glide()`
+   (linear ramp) only. Per-note fade-outs may keep it; their sources stop.
+7. **One voice per string** (sampler + synth voice stealing) — samples ring
+   ~5s, and without stealing a bar of eighths stacks ~48 notes into mush.
+8. **Sampled tones fall back to the synth, never to silence.**
+9. **The click never gets ducked with the guitar** — it sits outside
+   `guitarGain` so mic-mode muting can't take the metronome down.
+10. **Status never replaces content.** A prominent slot holds one kind of
+    thing; when a signal drops, dim the last value and put liveness in a side
+    pill. (The tuner and the count-in both violated this once.)
+11. **Controls that would invalidate a take lock while the transport runs**,
+    and say why. Stop and chord changes stay live.
+12. **Stepper buttons resolve against the store**, not a render-time value —
+    `setBpm(bpm + 1)` drops rapid clicks; use `nudgeBpm(delta)`.
+13. **The play screen is an app shell** (fixed-height column, transport in
+    flow). Sticky-footer-plus-measured-spacer was tried and fails silently in
+    environments that never fire `resize`/`ResizeObserver`. Long scrolling
+    pages (songs) may use sticky bottom bars — the app shell rule is for
+    /play, whose content must never be covered.
+14. **`slotsPerBar` is a field, not a constant** — 4/12/16 work end to end.
+15. **Nothing is gated behind sign-in.** localStorage is the working copy.
+16. **Store-backed UI under a Suspense boundary renders client-only**
+    (`useHydrated` gate, see PatternsTab) — hydrating server HTML against
+    localStorage state stalled the whole boundary with zero console output.
+17. **Check 320px before calling a layout done.**
+18. **Exercises are listening games, chords/progressions are play modes,
+    songs are songs.** Do not re-mix the three worlds; a uniform UI per world
+    was hard-won.
+
+## Verifying changes
+
+- `npx tsc --noEmit && npx eslint . && npm run build` — all three, always.
+- Audio changes: open `/soundcheck`, press run, expect a full PASS board
+  (loudness parity, no clipping, mute paths, click gaps ≈300ms).
+- Detector/DSP changes: these modules are pure — test with synthetic input
+  (node runs `.ts` directly) before trusting any in-browser impression.
+- The dev server is `strumlab` in `.claude/launch.json` (port 3210, autoPort).
+- **Embedded browser-pane quirks** (Claude Code preview): `ResizeObserver` and
+  `window.resize` never fire and `innerWidth` can read 0 — never build layout
+  that needs them, and measure with DOM rects, not viewport APIs. After heavy
+  HMR the pane can "rot": pages render but React never attaches (no fiber
+  keys, no console errors, all controls dead) and screenshots can go black.
+  Recycle the pane (close last tab, `preview_start` again) before diagnosing
+  any dead page as an app bug. Deleting routes while the dev server runs can
+  corrupt `.next/dev/types` — restart the server, or `rm -rf .next/types` and
+  rebuild.
+- The microphone cannot be exercised in the pane. Anything mic-dependent gets
+  its logic verified synthetically; the room test is the user's.
+
+## Licensing constraints (short form — /legal has the words)
+
+Chords, progressions, song structures: facts, shippable. Picking patterns:
+must be original practice arrangements, never note-for-note transcriptions of
+recordings. Lyrics: never, in any form. Audio: two sample sets CC0, the
+steel-string acoustic is GPL-3 — its licence files must travel with the audio
+directory, and per-instrument `SOURCE.txt` files are the provenance record.
