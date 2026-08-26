@@ -18,6 +18,7 @@ const LINKS = [
   { href: "/chords", label: "Chords" },
   { href: "/patterns", label: "Patterns" },
   { href: "/tuner", label: "Tuner" },
+  { href: "/songs", label: "Songs" },
 ];
 
 export function Nav({
@@ -42,7 +43,7 @@ export function Nav({
       </Link>
       {/* Always present, so the links sit hard right on a phone too. */}
       <span className="rule min-w-3 flex-1" />
-      <div className="flex shrink-0 items-center gap-3 sm:gap-6">
+      <div className="flex shrink-0 items-center gap-2 min-[380px]:gap-3 sm:gap-6">
         {LINKS.map((l) => {
           const active = pathname === l.href;
           return (

@@ -152,6 +152,34 @@ export function ChordChart({
         );
       })}
 
+      {/* hammer-on / pull-off arcs, over the string between the two frets */}
+      {overlay?.arcs?.map((arc, i) => {
+        const sx = x(arc.string);
+        const yOf = (fret: number) => (fret <= 0 ? padTop - 10 : y(fret - offset));
+        const y1 = yOf(arc.fromFret);
+        const y2 = yOf(arc.toFret);
+        const midY = (y1 + y2) / 2;
+        return (
+          <g key={`arc${i}`}>
+            <path
+              d={`M ${sx} ${Math.min(y1, y2)} Q ${sx + stringGap * 0.55} ${midY} ${sx} ${Math.max(y1, y2)}`}
+              fill="none"
+              stroke="var(--close)"
+              strokeWidth={1.8}
+            />
+            <text
+              x={sx + stringGap * 0.62}
+              y={midY + size * 0.028}
+              fontSize={size * 0.075}
+              fontWeight={800}
+              fill="var(--close)"
+            >
+              {arc.kind === "hammer" ? "H" : "P"}
+            </text>
+          </g>
+        );
+      })}
+
       {/* right-hand fingering, below the box — the fingerpicking hook */}
       {overlay?.pluck
         ? Object.entries(overlay.pluck).map(([str, finger]) =>

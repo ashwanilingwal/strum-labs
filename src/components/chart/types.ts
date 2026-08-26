@@ -36,6 +36,12 @@ export interface ChartOverlay {
   damped?: number[];
   /** Per-string fret overrides, for riffs and passing notes. -1 = don't play. */
   extraFrets?: Partial<Record<number, number>>;
+  /**
+   * Hammer-ons and pull-offs, drawn as a small arc over the string between the
+   * two frets with an H or P label — the standard notation, kept on the chart
+   * so the left hand learns where the move happens, not just that it exists.
+   */
+  arcs?: { string: number; fromFret: number; toFret: number; kind: "hammer" | "pull" }[];
 }
 
 export interface ChartOptions {

@@ -21,8 +21,16 @@ your machine.
 
 ## What's in it
 
-Five pages: a cover, the practice screen, a chord library (tap any card to hear
-it), your saved patterns, and a tuner.
+Six pages: a cover, the practice screen, a chord library (tap any card to hear
+it), your saved patterns, a tuner, and a song player.
+
+The song player follows along with you: pick a pace from 40% to 110% of the
+song's own tempo, fingerpicked or strummed. The active chord's chart lights the
+string being plucked and draws hammer-ons and pull-offs as H/P arcs. One song so
+far — Every Breath You Take, as a practice arrangement over the real chords
+(progressions are facts; note-for-note transcriptions of recordings aren't
+shippable, and `lib/music/songs.ts` says where that line sits). Songs are pure
+data, which is the groundwork for adding them via MCP later.
 
 You practise one of two things, and there's a toggle at the top for it: a single
 chord drilled against a rhythm, or a chord progression. Both are built the same
