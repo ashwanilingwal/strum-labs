@@ -1,14 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { exercisesByLevel, type Exercise } from "@/lib/music/exercises";
-import { previewPattern } from "@/lib/audio/preview";
-import { practisePattern } from "./goPractise";
-import Link from "next/link";
-import { DrillPlayer } from "./DrillPlayer";
+import { EXERCISES, exercisesByLevel, type Exercise } from "@/lib/music/exercises";
+import { ExerciseOverlay } from "./ExerciseOverlay";
 
-/** Each focus gets a colour, so a level scans as a palette, not a list. */
+/**
+ * The curriculum as a scannable list. Rows do exactly one thing: open the
+ * exercise in a centred overlay, where Previous/Next walk the whole path —
+ * practising never navigates away from this screen.
+ */
+
 const FOCUS_COLOUR: Record<Exercise["focus"], string> = {
   rhythm: "var(--accent)",
   "left hand": "var(--close)",
@@ -22,18 +23,10 @@ const KIND_LABEL: Record<Exercise["kind"], string> = {
   notes: "game · listen",
 };
 
-/**
- * The curriculum, levels in order, each drill openable in place.
- *
- * Strum drills hand their pattern to the practice screen, where the
- * microphone can score them. Technique drills play right here on the song
- * machinery, chart animating, because what they teach is watched, not scored.
- */
-
 export function ExercisesTab() {
-  const router = useRouter();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openIndex, setOpenIndex] = useState<number | null>(null);
   const levels = exercisesByLevel();
+  const open = openIndex !== null ? EXERCISES[openIndex] : null;
 
   return (
     <div className="space-y-8">
@@ -54,90 +47,38 @@ export function ExercisesTab() {
 
           <div className="mt-3 space-y-2">
             {level.items.map((ex) => (
-              <ExerciseRow
+              <button
                 key={ex.id}
-                exercise={ex}
-                open={openId === ex.id}
-                onToggle={() => setOpenId(openId === ex.id ? null : ex.id)}
-                onPractise={() => {
-                  if (ex.pattern) {
-                    practisePattern(ex.pattern);
-                    router.push("/play");
-                  }
-                }}
-              />
+                type="button"
+                onClick={() => setOpenIndex(EXERCISES.indexOf(ex))}
+                className="card-flat block-light flex w-full items-center gap-3 px-4 py-3 text-left transition hover:opacity-90"
+              >
+                <span
+                  className="h-8 w-1 shrink-0 rounded-full"
+                  style={{ background: FOCUS_COLOUR[ex.focus] }}
+                  aria-hidden="true"
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-display text-lg leading-tight text-chrome-700">{ex.title}</span>
+                  <span className="caps" style={{ color: FOCUS_COLOUR[ex.focus] }}>{ex.focus}</span>
+                </span>
+                <span className="caps shrink-0 rounded-full border border-line px-2 py-0.5 text-fg-dim">
+                  {KIND_LABEL[ex.kind]}
+                </span>
+              </button>
             ))}
           </div>
         </section>
       ))}
-    </div>
-  );
-}
 
-function ExerciseRow({
-  exercise, open, onToggle, onPractise,
-}: {
-  exercise: Exercise;
-  open: boolean;
-  onToggle: () => void;
-  onPractise: () => void;
-}) {
-  return (
-    <div className="card-flat block-light overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        className="flex w-full items-center gap-3 px-4 py-3 text-left"
-      >
-        <span
-          className="h-8 w-1 shrink-0 rounded-full"
-          style={{ background: FOCUS_COLOUR[exercise.focus] }}
-          aria-hidden="true"
+      {open !== null && openIndex !== null ? (
+        <ExerciseOverlay
+          exercise={open}
+          onClose={() => setOpenIndex(null)}
+          onStep={(d) => setOpenIndex(Math.min(EXERCISES.length - 1, Math.max(0, openIndex + d)))}
+          hasPrev={openIndex > 0}
+          hasNext={openIndex < EXERCISES.length - 1}
         />
-        <span className="min-w-0 flex-1">
-          <span className="block font-display text-lg leading-tight text-chrome-700">{exercise.title}</span>
-          <span className="caps" style={{ color: FOCUS_COLOUR[exercise.focus] }}>{exercise.focus}</span>
-        </span>
-        <span className="caps shrink-0 rounded-full border border-line px-2 py-0.5 text-fg-dim">
-          {KIND_LABEL[exercise.kind]}
-        </span>
-        <span aria-hidden="true" className="shrink-0 text-fg-dim transition-transform" style={{ transform: open ? "rotate(180deg)" : "none" }}>
-          ▾
-        </span>
-      </button>
-
-      {open ? (
-        <div className="border-t border-line px-4 py-4">
-          <p className="text-sm leading-relaxed text-fg-muted">{exercise.coaching}</p>
-          <p className="mt-2 text-xs text-fg-dim">
-            <span className="caps">done when</span> · {exercise.goal}
-          </p>
-
-          {exercise.kind === "notes" ? (
-            <div className="mt-4">
-              <Link href={`/game?id=${exercise.id}`} className="btn btn-lit inline-flex">
-                Play the game
-              </Link>
-              <p className="caps mt-2 text-fg-dim opacity-70">
-                untimed · the microphone confirms each note
-              </p>
-            </div>
-          ) : exercise.kind === "pick" && exercise.song ? (
-            <div className="mt-4">
-              <DrillPlayer song={exercise.song} />
-            </div>
-          ) : exercise.pattern ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button type="button" className="btn btn-lit" onClick={onPractise}>
-                Open in Play
-              </button>
-              <button type="button" className="btn" onClick={() => exercise.pattern && void previewPattern(exercise.pattern)}>
-                Hear it once
-              </button>
-            </div>
-          ) : null}
-        </div>
       ) : null}
     </div>
   );
