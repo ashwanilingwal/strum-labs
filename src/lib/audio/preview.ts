@@ -47,6 +47,22 @@ export async function previewPattern(pattern: Pattern) {
   });
 }
 
+/**
+ * Play a sequence of single notes at a gentle, even pace — the "hear it"
+ * demo for exercise games. Same-string repeats steal their voice, exactly as
+ * fingers would.
+ */
+export async function previewNotes(
+  notes: { midi: number; voice?: number }[],
+  stepS = 0.55,
+) {
+  const engine = await ready();
+  const t0 = engine.currentTime + 0.08;
+  notes.forEach((note, i) => {
+    engine.pluck(note.midi, { at: t0 + i * stepS, gain: 0.55, voice: note.voice });
+  });
+}
+
 export function stopPreview() {
   getEngine().silence();
 }

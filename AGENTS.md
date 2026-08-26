@@ -71,7 +71,7 @@ and `components/` may import React. Data files are the extension points:
 | When things happen | `lib/audio/transport.ts` | Lookahead scheduler; supports `fromSlot` for mid-song starts |
 | Synth / audio graph / duck | `lib/audio/engine.ts` | Karplus-Strong; `glide()` for all bus levels; limiter is the last node; `output` tap for diagnostics |
 | Sampled playback / voice stealing | `lib/audio/sampler.ts` | `trim` per instrument in `samples/index.ts`; keep abs peak < 0.9 at the bus |
-| One-shot previews (Learn) | `lib/audio/preview.ts` | Books all strums up front; `stopPreview()` |
+| One-shot previews | `lib/audio/preview.ts` | Books everything up front; `previewChord`, `previewPattern`, `previewNotes` (the exercise "Hear it" demo), `stopPreview()` |
 
 ### Listening
 | To change | Open | Notes |

@@ -33,6 +33,9 @@ export function useNoteGame(targets: NoteTarget[]) {
   const [progress, setProgress] = useState(0);
   const [heard, setHeard] = useState<string | null>(null);
   const [hits, setHits] = useState(0);
+  /** Increments on every hit — the UI keys its green flash off this, so two
+   *  hits in a row still flash twice. */
+  const [hitSeq, setHitSeq] = useState(0);
 
   const captureRef = useRef<MicCapture | null>(null);
   const matcherRef = useRef<NoteMatcher | null>(null);
@@ -84,6 +87,7 @@ export function useNoteGame(targets: NoteTarget[]) {
 
         if (fed.hit) {
           setHits((h) => h + 1);
+          setHitSeq((n) => n + 1);
           // The reward: the note you just found, an octave up, quietly.
           engine.pluck(matcher.targetMidi + 12, { gain: 0.25, duration: 0.6 });
           const next = indexRef.current + 1;
@@ -111,5 +115,5 @@ export function useNoteGame(targets: NoteTarget[]) {
 
   useEffect(() => () => captureRef.current?.stop(), []);
 
-  return { status, message, index, progress, heard, hits, start, stop };
+  return { status, message, index, progress, heard, hits, hitSeq, start, stop };
 }

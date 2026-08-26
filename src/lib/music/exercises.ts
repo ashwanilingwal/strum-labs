@@ -39,6 +39,7 @@ export const LEVELS = [
   "One finger",
   "Two fingers",
   "Three and four",
+  "Up the neck",
   "Right hand",
 ] as const;
 
@@ -107,6 +108,18 @@ export const EXERCISES: Exercise[] = [
     ],
   },
 
+  {
+    id: "middle-second-frets",
+    title: "Middle finger, every string",
+    level: 1, focus: "left hand",
+    coaching:
+      "Second fret, middle finger only — the index stays off duty. Each finger has to earn its own strength; borrowing the index forever is how the others stay weak.",
+    goal: "Six clean notes without the index sneaking down to help.",
+    notes: [
+      n(0, 2, "F#"), n(1, 2, "B"), n(2, 2, "E"), n(3, 2, "A"), n(4, 2, "C#"), n(5, 2, "F#"),
+    ],
+  },
+
   // ---- Level 2: Two fingers -----------------------------------------------
   {
     id: "one-two-walk",
@@ -142,6 +155,19 @@ export const EXERCISES: Exercise[] = [
     notes: [
       n(1, 0, "A"), n(2, 0, "D"), n(3, 0, "G"),
       n(1, 0, "A"), n(2, 0, "D"), n(3, 0, "G"),
+    ],
+  },
+
+  {
+    id: "two-string-crossing",
+    title: "Crossing over",
+    level: 2, focus: "left hand",
+    coaching:
+      "One-two on the E string, one-two on the A string, and onward — the fingers change strings as a pair. Crossing is where most stumbles live; slow it until it is boring.",
+    goal: "Four crossings without a dead note at the seam.",
+    notes: [
+      n(0, 1, "F"), n(1, 1, "A#"), n(0, 2, "F#"), n(1, 2, "B"),
+      n(2, 1, "D#"), n(3, 1, "G#"), n(2, 2, "E"), n(3, 2, "A"),
     ],
   },
 
@@ -184,11 +210,84 @@ export const EXERCISES: Exercise[] = [
     ],
   },
 
-  // ---- Level 4: Right hand ------------------------------------------------
+  {
+    id: "descending-four",
+    title: "The descending four",
+    level: 3, focus: "left hand",
+    coaching:
+      "Pinky first: four, three, two, one. Coming down is harder than going up — every finger has to be already waiting on its fret, not arriving late from above.",
+    goal: "Both strings descended with all four fingers planted before you start.",
+    notes: [
+      n(0, 4, "G#"), n(0, 3, "G"), n(0, 2, "F#"), n(0, 1, "F"),
+      n(1, 4, "C#"), n(1, 3, "C"), n(1, 2, "B"), n(1, 1, "A#"),
+    ],
+  },
+  {
+    id: "spider-1423",
+    title: "The spider, backwards",
+    level: 3, focus: "left hand",
+    coaching:
+      "One, four, two, three — the other scramble. If 1-3-2-4 has become comfortable, this one will feel brand new, which is exactly the point.",
+    goal: "Clean on both strings without pausing to work out which finger is next.",
+    notes: [
+      n(0, 1, "F"), n(0, 4, "G#"), n(0, 2, "F#"), n(0, 3, "G"),
+      n(1, 1, "A#"), n(1, 4, "C#"), n(1, 2, "B"), n(1, 3, "C"),
+    ],
+  },
+  {
+    id: "pinky-pairs",
+    title: "Pinky stretches",
+    level: 3, focus: "left hand",
+    coaching:
+      "Index and pinky only, frets one and four. The stretch should come from opening the hand, not bending the wrist — if it hurts, stop and shake it out.",
+    goal: "Three string-pairs with the pinky landing square, not on its side.",
+    notes: [
+      n(0, 1, "F"), n(0, 4, "G#"), n(1, 1, "A#"), n(1, 4, "C#"), n(2, 1, "D#"), n(2, 4, "F#"),
+    ],
+  },
+
+  // ---- Level 4: Up the neck -----------------------------------------------
+  {
+    id: "fifth-position",
+    title: "Fifth position",
+    level: 4, focus: "left hand",
+    coaching:
+      "The chromatic four again, but starting at fret five — one finger per fret, frets five to eight. Higher up, the frets are closer; let your hand enjoy it.",
+    goal: "Both strings clean without looking back at the nut to find yourself.",
+    notes: [
+      n(0, 5, "A"), n(0, 6, "A#"), n(0, 7, "B"), n(0, 8, "C"),
+      n(1, 5, "D"), n(1, 6, "D#"), n(1, 7, "E"), n(1, 8, "F"),
+    ],
+  },
+  {
+    id: "octave-pairs",
+    title: "Octave pairs",
+    level: 4, focus: "left hand",
+    coaching:
+      "Each open string, then the same note an octave up, two strings over. Hearing the octave is how you start finding any note anywhere — same name, new address.",
+    goal: "All four pairs found without counting frets.",
+    notes: [
+      n(0, 0, "E"), n(2, 2, "E"), n(1, 0, "A"), n(3, 2, "A"),
+      n(2, 0, "D"), n(4, 3, "D"), n(3, 0, "G"), n(5, 3, "G"),
+    ],
+  },
+  {
+    id: "home-and-away",
+    title: "Home and away",
+    level: 4, focus: "left hand",
+    coaching:
+      "One string, big jumps: first fret, fifth, third, seventh. Shift the whole hand, land, then press — a shift that arrives pressing is a shift that buzzes.",
+    goal: "Every landing clean on the first try, eyes on the target fret before the hand moves.",
+    notes: [
+      n(0, 1, "F"), n(0, 5, "A"), n(0, 3, "G"), n(0, 7, "B"), n(0, 5, "A"), n(0, 1, "F"),
+    ],
+  },
+
+  // ---- Level 5: Right hand ------------------------------------------------
   {
     id: "steady-thumb",
     title: "Steady thumb",
-    level: 4, focus: "right hand",
+    level: 5, focus: "right hand",
     coaching:
       "Thumb only, alternating between the A and G strings. Everything in fingerstyle is built over this heartbeat — the fingers decorate, the thumb keeps time.",
     goal: "Eight alternations without watching your hand.",
@@ -200,7 +299,7 @@ export const EXERCISES: Exercise[] = [
   {
     id: "pima-roll",
     title: "The p-i-m-a roll",
-    level: 4, focus: "right hand",
+    level: 5, focus: "right hand",
     coaching:
       "Thumb, index, middle, ring — one string each, low to high and back. Always the same finger on the same string; the roll behind half of fingerstyle.",
     goal: "An even roll where no note is louder than its neighbours.",
@@ -211,9 +310,21 @@ export const EXERCISES: Exercise[] = [
     ],
   },
   {
+    id: "thumb-and-fingers",
+    title: "Thumb and fingers",
+    level: 5, focus: "right hand",
+    coaching:
+      "The thumb keeps its bass note; the fingers answer from above — bass, treble, bass, treble. This split is the whole trick of fingerstyle: two voices, one hand.",
+    goal: "The bass stays steady while the treble answers, four rounds through.",
+    notes: [
+      n(1, 0, "A"), n(4, 0, "B"), n(1, 0, "A"), n(5, 0, "E"),
+      n(1, 0, "A"), n(4, 0, "B"), n(1, 0, "A"), n(5, 0, "E"),
+    ],
+  },
+  {
     id: "string-skips",
     title: "String skips",
-    level: 4, focus: "right hand",
+    level: 5, focus: "right hand",
     coaching:
       "Non-adjacent strings, on purpose. Skipping cleanly is what separates aiming from hoping.",
     goal: "Every skip lands its string first time.",

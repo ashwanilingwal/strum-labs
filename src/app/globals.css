@@ -431,6 +431,37 @@ body {
 .timing-mean { position: absolute; top: 3px; bottom: 3px; width: 2px; margin-left: -1px; background: var(--accent); transition: left 200ms ease-out; }
 .timing-needle { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; border-radius: 2px; transition: left 140ms ease-out; }
 
+/* --- note-game hit flash ---------------------------------------------------
+   The green moment. Keyed by hit count in the component so consecutive hits
+   each get their own flash; `forwards` leaves it invisible when done. */
+
+.hit-flash {
+  position: absolute;
+  inset: -8px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 3px solid var(--tight);
+  border-radius: 20px;
+  background: rgba(95, 227, 160, 0.12);
+  color: var(--tight);
+  font-size: 2.2rem;
+  font-weight: 800;
+  pointer-events: none;
+  animation: hit-pop 700ms ease-out forwards;
+}
+
+@keyframes hit-pop {
+  0% { opacity: 1; transform: scale(0.94); }
+  55% { opacity: 1; transform: scale(1.02); }
+  100% { opacity: 0; transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hit-flash { animation: none; opacity: 0; }
+}
+
 /* --- confetti motifs ------------------------------------------------------ */
 
 /* Absolute, not fixed: blocks paint an opaque ground, so a page-level layer

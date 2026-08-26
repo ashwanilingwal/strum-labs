@@ -1,6 +1,8 @@
 "use client";
 
-import { useNoteGame } from "@/hooks/useNoteGame";
+import { useEffect, useRef, useState } from "react";
+import { targetMidi, useNoteGame } from "@/hooks/useNoteGame";
+import { previewNotes, stopPreview } from "@/lib/audio/preview";
 import { type Exercise, type NoteTarget } from "@/lib/music/exercises";
 import type { Chord } from "@/lib/music/chords";
 import { ChordChart } from "./chart/ChordChart";
@@ -24,15 +26,54 @@ function noteAsChord(t: NoteTarget): Chord {
   };
 }
 
+const DEMO_STEP_MS = 550;
+
 export function NoteGameBody({ exercise }: { exercise: Exercise }) {
   const targets = exercise.notes ?? [];
   const game = useNoteGame(targets);
-  const current = targets[game.index];
-  const upcoming = targets.slice(game.index + 1, game.index + 5);
   const playing = game.status === "listening";
 
+  /**
+   * "Hear it": the app plays the whole sequence gently, stepping the big
+   * display through each target as it sounds — so the drill is heard before
+   * it is attempted. Pure playback; game state never advances.
+   */
+  const [demoIndex, setDemoIndex] = useState<number | null>(null);
+  const demoTimers = useRef<number[]>([]);
+  const clearDemo = () => {
+    demoTimers.current.forEach(clearTimeout);
+    demoTimers.current = [];
+  };
+  useEffect(() => () => { clearDemo(); stopPreview(); }, []);
+
+  const demoing = demoIndex !== null;
+  const playDemo = () => {
+    if (playing) return;
+    clearDemo();
+    void previewNotes(
+      targets.map((t) => ({ midi: targetMidi(t), voice: t.string })),
+      DEMO_STEP_MS / 1000,
+    );
+    targets.forEach((_, i) => {
+      demoTimers.current.push(window.setTimeout(() => setDemoIndex(i), i * DEMO_STEP_MS));
+    });
+    demoTimers.current.push(
+      window.setTimeout(() => setDemoIndex(null), targets.length * DEMO_STEP_MS + 250),
+    );
+  };
+  const stopDemo = () => {
+    clearDemo();
+    stopPreview();
+    setDemoIndex(null);
+  };
+
+  // During the demo the big slot follows the demo, not the game.
+  const shown = demoing ? targets[demoIndex] : targets[game.index];
+  const upcoming = targets.slice(game.index + 1, game.index + 5);
+
   const pill =
-    game.status === "idle" ? { dot: "var(--fg-dim)", label: "Mic off" }
+    demoing ? { dot: "var(--accent)", label: "Playing it for you" }
+      : game.status === "idle" ? { dot: "var(--fg-dim)", label: "Mic off" }
       : game.status === "opening" ? { dot: "var(--close)", label: "Opening…" }
       : game.status === "error" ? { dot: "var(--loose)", label: "Mic failed" }
       : game.status === "done" ? { dot: "var(--tight)", label: "Done" }
@@ -65,19 +106,43 @@ export function NoteGameBody({ exercise }: { exercise: Exercise }) {
               smaller — the split a phone needs, desktop just gets more air. */}
           <div className="grid grid-cols-[3fr_2fr] gap-4 pt-10 sm:gap-8">
             <div>
-              <div className="block-light card-flat mx-auto max-w-48 border border-line p-3">
-                <ChordChart chord={noteAsChord(current)} overlay={playing ? { sounding: [current.string] } : undefined} />
+              <div className="relative mx-auto max-w-48">
+                <div className="block-light card-flat border border-line p-3">
+                  <ChordChart
+                    chord={noteAsChord(shown)}
+                    overlay={playing || demoing ? { sounding: [shown.string] } : undefined}
+                  />
+                </div>
+                {/* The green moment. Keyed so every hit flashes, even repeats. */}
+                {game.hitSeq > 0 ? (
+                  <div key={game.hitSeq} className="hit-flash" aria-hidden="true">✓</div>
+                ) : null}
               </div>
               <div className="mt-2 text-center">
-                <ChromeText className="block text-[clamp(2rem,8vw,3.5rem)]">{current.name}</ChromeText>
+                <ChromeText className="block text-[clamp(2rem,8vw,3.5rem)]">{shown.name}</ChromeText>
                 <p className="caps mt-1 text-fg-dim">
-                  string {current.string + 1} · {current.fret === 0 ? "open" : `fret ${current.fret}`}
+                  string {shown.string + 1} · {shown.fret === 0 ? "open" : `fret ${shown.fret}`}
                 </p>
                 <div className="mx-auto mt-3 h-2 w-36 overflow-hidden rounded-full border border-line">
                   <div
                     className="h-full rounded-full transition-[width] duration-100"
                     style={{ width: `${Math.round(game.progress * 100)}%`, background: "var(--tight)" }}
                   />
+                </div>
+                {/* The whole sequence as dots: green found, accent current. */}
+                <div className="mt-2 flex flex-wrap justify-center gap-1" aria-hidden="true">
+                  {targets.map((_, i) => (
+                    <span
+                      key={i}
+                      className="h-1.5 w-1.5 rounded-full transition-colors"
+                      style={{
+                        background:
+                          i < game.index ? "var(--tight)"
+                            : i === game.index ? "var(--accent)"
+                            : "var(--line)",
+                      }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -107,9 +172,25 @@ export function NoteGameBody({ exercise }: { exercise: Exercise }) {
             <button
               type="button"
               className={`btn ${playing ? "btn-hot" : "btn-lit"}`}
-              onClick={() => (playing || game.status === "opening" ? game.stop() : void game.start())}
+              onClick={() => {
+                if (playing || game.status === "opening") {
+                  game.stop();
+                } else {
+                  stopDemo();
+                  void game.start();
+                }
+              }}
             >
               {playing ? "Stop" : game.status === "opening" ? "Opening…" : "Start the game"}
+            </button>
+            <button
+              type="button"
+              className={`btn ${demoing ? "btn-hot" : ""}`}
+              onClick={() => (demoing ? stopDemo() : playDemo())}
+              disabled={playing}
+              title={playing ? "Stop the game first" : "The app plays the drill through once"}
+            >
+              {demoing ? "Stop" : "Hear it"}
             </button>
           </div>
           {game.message ? <p className="mt-3 text-xs text-loose">{game.message}</p> : null}
