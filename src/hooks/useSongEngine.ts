@@ -11,7 +11,7 @@
  * finger landing on (or leaving) the fret would.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { getEngine } from "@/lib/audio/engine";
 import { Transport } from "@/lib/audio/transport";
 import { chordById, chordMidiNotes } from "@/lib/music/chords";
@@ -21,6 +21,7 @@ import {
 import { STANDARD_TUNING } from "@/lib/music/theory";
 import { appStore } from "@/lib/storage/settings";
 import { isInstrument } from "@/lib/audio/samples";
+import type { Tone } from "@/lib/audio/engine";
 
 export type SongMode = "pick" | "strum";
 
@@ -28,6 +29,9 @@ const UI_TICK_MS = 25;
 
 export function useSongEngine(song: Song) {
   const engine = useMemo(() => getEngine(), []);
+  // Subscribed, not a one-off read — the tone select must re-render when the
+  // store changes, including changes made from the settings sheet.
+  const app = useSyncExternalStore(appStore.subscribe, appStore.getSnapshot, appStore.getServerSnapshot);
   const bars = useMemo(() => songBars(song), [song]);
   const strum = useMemo(() => songStrum(song), [song]);
   const totalSlots = bars.length * song.slotsPerBar;
@@ -112,9 +116,9 @@ export function useSongEngine(song: Song) {
     setActiveSlot(-1);
   }, [engine]);
 
-  const start = useCallback(async () => {
+  const start = useCallback(async (fromSlot = 0) => {
     await engine.init();
-    // The song page respects the tone chosen in practice settings.
+    // The song page shares the app-wide tone; changing it here writes back.
     const tone = appStore.get().audio.tone;
     engine.setTone(tone);
     if (isInstrument(tone)) void engine.loadSamples();
@@ -129,9 +133,35 @@ export function useSongEngine(song: Song) {
     } else {
       transportRef.current.update({ slotCount: totalSlots, slotSeconds, onSlot: handleSlot });
     }
-    transportRef.current.start();
+    transportRef.current.start(undefined, fromSlot);
     setPlaying(true);
   }, [engine, handleSlot, slotSeconds, totalSlots]);
+
+  /**
+   * Begin playback at a chosen bar — the practice move a long song needs:
+   * nobody drills the outro by sitting through five sections to reach it.
+   * Works stopped or mid-play; playing simply restarts from the new spot.
+   */
+  const startFromBar = useCallback(
+    (barIndex: number) => {
+      transportRef.current?.stop();
+      engine.silence();
+      uiQueue.current = [];
+      setActiveSlot(barIndex * song.slotsPerBar);
+      void start(barIndex * song.slotsPerBar);
+    },
+    [engine, song.slotsPerBar, start],
+  );
+
+  /** Switch instrument mid-song; persists to the app-wide setting. */
+  const setTone = useCallback(
+    (tone: Tone) => {
+      appStore.set((prev) => ({ ...prev, audio: { ...prev.audio, tone } }));
+      engine.setTone(tone);
+      if (isInstrument(tone)) void engine.loadSamples();
+    },
+    [engine],
+  );
 
   const toggle = useCallback(() => {
     if (playing) stop();
@@ -162,7 +192,8 @@ export function useSongEngine(song: Song) {
   const activeStep = activeSlot >= 0 ? activeSlot % song.slotsPerBar : -1;
 
   return {
-    playing, toggle, stop,
+    playing, toggle, stop, startFromBar, setTone,
+    tone: app.audio.tone,
     activeSlot, activeBar, activeStep,
     mode, setMode, pace, setPace, click, setClick,
     bars,

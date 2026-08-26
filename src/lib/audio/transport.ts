@@ -52,10 +52,13 @@ export class Transport {
     this.opts = { ...this.opts, ...patch };
   }
 
-  /** `startAt` is an absolute audio time — used to leave room for a count-in. */
-  start(startAt?: number) {
+  /**
+   * `startAt` is an absolute audio time — used to leave room for a count-in.
+   * `fromSlot` begins the loop mid-way, for playing a song from a chosen bar.
+   */
+  start(startAt?: number, fromSlot = 0) {
     if (this.timer) return;
-    this.nextSlot = 0;
+    this.nextSlot = fromSlot % this.opts.slotCount;
     this.cycle = 0;
     // A small offset so the very first slot is scheduled, not played late.
     this.startedAt = Math.max(startAt ?? 0, this.opts.now() + 0.08);

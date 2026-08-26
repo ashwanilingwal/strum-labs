@@ -5,6 +5,8 @@ import { useSongEngine, type SongMode } from "@/hooks/useSongEngine";
 import { chordById } from "@/lib/music/chords";
 import { fingerFor, pickFret, type Song } from "@/lib/music/songs";
 import type { ChartOverlay } from "./chart/types";
+import { INSTRUMENTS } from "@/lib/audio/samples";
+import type { Tone } from "@/lib/audio/engine";
 import { ChordChart } from "./chart/ChordChart";
 import { ChromeText } from "./ui/ChromeText";
 import { MotifField } from "./ui/MotifField";
@@ -130,31 +132,42 @@ export function SongPlayer({ song }: { song: Song }) {
           <div className="mt-6 space-y-3">
             {sections.map((section) => (
               <div key={section.startIndex}>
-                <p className="caps mb-1.5 text-fg-dim">{section.name}</p>
+                <button
+                  type="button"
+                  onClick={() => engine.startFromBar(section.startIndex)}
+                  className="caps mb-1.5 text-fg-dim transition hover:text-accent"
+                  title={`Play from ${section.name}`}
+                >
+                  {section.name} <span aria-hidden="true">▸</span>
+                </button>
                 <ol className="flex flex-wrap gap-1.5">
                   {section.bars.map((b, i) => {
                     const index = section.startIndex + i;
                     const isNow = index === activeBar;
                     const hasArt = b.picking.some((s) => s?.art);
                     return (
-                      <li
-                        key={index}
-                        className="caps rounded-full border px-2.5 py-1"
-                        style={{
-                          borderColor: isNow ? "var(--accent)" : "var(--line)",
-                          background: isNow ? "rgba(95,210,242,0.12)" : "transparent",
-                          color: isNow ? "var(--fg)" : "var(--fg-dim)",
-                        }}
-                      >
-                        {b.chordId}
-                        {hasArt ? <span className="ml-1 text-close">·</span> : null}
+                      <li key={index}>
+                        <button
+                          type="button"
+                          onClick={() => engine.startFromBar(index)}
+                          aria-label={`Play from bar ${index + 1} (${b.chordId})`}
+                          className="caps rounded-full border px-2.5 py-1 transition hover:border-accent"
+                          style={{
+                            borderColor: isNow ? "var(--accent)" : "var(--line)",
+                            background: isNow ? "rgba(95,210,242,0.12)" : "transparent",
+                            color: isNow ? "var(--fg)" : "var(--fg-dim)",
+                          }}
+                        >
+                          {b.chordId}
+                          {hasArt ? <span className="ml-1 text-close">·</span> : null}
+                        </button>
                       </li>
                     );
                   })}
                 </ol>
               </div>
             ))}
-            <p className="caps text-fg-dim opacity-70">· marks a bar with a hammer-on or pull-off</p>
+            <p className="caps text-fg-dim opacity-70">tap any bar or section to play from there · marks a bar with a hammer-on or pull-off</p>
           </div>
         </div>
       </section>
@@ -207,6 +220,18 @@ export function SongPlayer({ song }: { song: Song }) {
               {engine.pace}% · {engine.effectiveBpm} bpm
             </span>
           </div>
+
+          <select
+            value={engine.tone}
+            onChange={(e) => engine.setTone(e.target.value as Tone)}
+            className="btn !px-3"
+            aria-label="Guitar sound"
+          >
+            {Object.values(INSTRUMENTS).map((inst) => (
+              <option key={inst.id} value={inst.id}>{inst.label}</option>
+            ))}
+            <option value="synth">Synth</option>
+          </select>
 
           <button
             type="button"
