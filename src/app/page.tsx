@@ -44,9 +44,14 @@ export default function Page() {
         </div>
         <div className="mx-auto mt-12 max-w-5xl">
           <div className="rule" />
-          <p className="caps mt-4 text-fg-dim">
-            Guitar recordings CC0 · FreePats · nothing leaves your browser
-          </p>
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="caps text-fg-dim">
+              Real recordings · nothing leaves your browser
+            </p>
+            <Link href="/legal" className="caps text-accent underline underline-offset-4">
+              Copyright &amp; licences
+            </Link>
+          </div>
         </div>
       </section>
     </main>
