@@ -15,10 +15,9 @@ import { usePathname } from "next/navigation";
 
 const LINKS = [
   { href: "/play", label: "Play" },
-  { href: "/chords", label: "Chords" },
-  { href: "/patterns", label: "Patterns" },
-  { href: "/tuner", label: "Tuner" },
+  { href: "/learn", label: "Learn" },
   { href: "/songs", label: "Songs" },
+  { href: "/tuner", label: "Tuner" },
 ];
 
 export function Nav({

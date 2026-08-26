@@ -3,6 +3,14 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
+  async redirects() {
+    // Chords and patterns folded into /learn; bookmarks keep working.
+    return [
+      { source: "/chords", destination: "/learn?tab=chords", permanent: false },
+      { source: "/patterns", destination: "/learn?tab=patterns", permanent: false },
+    ];
+  },
+
   async headers() {
     return [
       {

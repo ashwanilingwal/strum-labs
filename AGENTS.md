@@ -16,8 +16,7 @@ Four routes:
 | --- | --- |
 | `/` | Cover. One wordmark, one sentence, one way in. It does nothing else on purpose. |
 | `/play` | The practice screen — chords, metronome, audio, settings. |
-| `/chords` | Every chord as a browsable reference, tap to hear. |
-| `/patterns` | Saved patterns as cards with their stroke grid drawn. |
+| `/learn` | Chords, patterns and exercises as tabs (`?tab=`). `/chords` and `/patterns` redirect here. |
 | `/tuner` | Tuner. Its own DSP — see below. |
 | `/songs` | Follow-along song player: fingerpick or strum, live pace control. |
 
@@ -46,6 +45,7 @@ Find your row, open that file, stop. None of these require reading the rest.
 | Add a **chord** | `lib/music/chords.ts` | One literal. MIDI notes, pitch classes and the mic's match template are all derived. |
 | The **pattern** data model | `lib/music/pattern.ts` | `normalise()` is the only way a pattern should ever be mutated. |
 | Add a **preset** | `lib/music/pattern.ts` → `PRESET_SOURCE` | |
+| Add an **exercise** | `lib/music/exercises.ts` → `EXERCISES` | Data only. Strum drills carry a `Pattern` (opens in /play, mic-scorable); technique drills carry a two-bar `Song` (plays inline). Add to the level it belongs to, not the end. |
 | Add a **song** | `lib/music/songs.ts` → `SONGS` | Data only — sections of bars, each with a chord id and a picking array; hammer/pull as `art` on a step. No code changes, which is what makes MCP-driven additions possible later. Progressions are facts and shippable; note-for-note transcriptions of recordings are not — write practice arrangements and say so in the song's `note`. |
 | Add a **strum style** or **progression** | `lib/music/library.ts` | A style is one bar of strokes and tiles across any chord list; `buildPattern` multiplies the two. Adding one style gives every progression a new feel. |
 | What the player is practising | `mode` + `pick` in `lib/storage/settings.ts` | Selections write to the reserved `QUICK_ID` pattern, never to a saved one. |
@@ -126,3 +126,8 @@ Break these and things fail in ways that are hard to trace back.
 16. **The click never gets ducked with the guitar.** It sits outside
    `guitarGain` in the audio graph on purpose — muting the guitar for the mic
    must not take the metronome with it.
+17. **Store-backed UI on the Learn page renders client-only.** PatternsTab
+    gates on the `useHydrated` trick. Hydrating server HTML against
+    localStorage-backed state stalled the page's whole Suspense boundary —
+    silently: no console error, React simply never attached, and every control
+    on the page was dead. If a Learn tab reads `appStore`, gate it.
