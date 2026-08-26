@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { EXERCISES, LEVELS, type Exercise } from "@/lib/music/exercises";
+import { EXERCISES, LEVELS, LEVEL_BLURBS, type Exercise } from "@/lib/music/exercises";
 import { NoteGameBody } from "./NoteGameBody";
 
 /**
@@ -49,7 +49,9 @@ export function ExerciseMode() {
           })}
         </div>
 
-        {/* Games in this level. */}
+        <p className="caps mt-1.5 text-fg-dim opacity-80">{LEVEL_BLURBS[level]}</p>
+
+        {/* Games in this tier. */}
         <div className="mt-2 flex gap-1.5 overflow-x-auto pb-1">
           {inLevel.map((e) => {
             const i = EXERCISES.indexOf(e);
@@ -68,7 +70,7 @@ export function ExerciseMode() {
                 <span className="block text-sm font-semibold" style={{ color: active ? "var(--fg)" : "var(--fg-dim)" }}>
                   {e.title}
                 </span>
-                <span className="caps block" style={{ color: FOCUS_COLOUR[e.focus] }}>{e.focus}</span>
+                <span className="caps block" style={{ color: FOCUS_COLOUR[e.focus] }}>{e.family}</span>
               </button>
             );
           })}
@@ -76,7 +78,7 @@ export function ExerciseMode() {
 
         <div className="block-light card-flat mt-3 flex-1 overflow-y-auto p-4 sm:p-5">
           <p className="caps text-fg-dim">
-            level {exercise.level + 1} · {level}
+            {level} · {exercise.family} · {exercise.focus}
           </p>
           <h2 className="font-display mt-0.5 text-2xl leading-tight text-chrome-700">{exercise.title}</h2>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-fg-muted">{exercise.coaching}</p>

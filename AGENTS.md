@@ -58,7 +58,7 @@ and `components/` may import React. Data files are the extension points:
 | a strum style / progression | `lib/music/library.ts` | practice picker (styles × progressions compose) |
 | a pattern preset | `lib/music/pattern.ts` → `PRESET_SOURCE` | patterns tab |
 | a song | `lib/music/songs.ts` → `SONGS` | song player (chords are facts; no lyrics, no note-for-note transcriptions — see /legal) |
-| an exercise | `lib/music/exercises.ts` → `EXERCISES` | play screen's Exercises mode. ONE kind only: a listening game (`notes` targets, untimed). Add to its level, not the end |
+| an exercise | `lib/music/exercises.ts` → `EXERCISES` | play screen's Exercises mode. ONE kind only: a listening game (`notes` targets, untimed). `level` is a difficulty TIER (Starter→Advanced), `family` the topic tag (spider, octaves, finger ladder…). Add to its tier; keep the array tier-sorted — Prev/Next walks it in order |
 | a tuning | `lib/music/tuning.ts` → `TUNINGS` | tuner |
 | a sampled instrument | `scripts/build-samples.py <id> <dir>` + one entry in `lib/audio/samples/index.ts` | tone selects. Licence files must travel with the audio |
 
