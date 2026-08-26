@@ -34,6 +34,9 @@ Find your row, open that file, stop. None of these require reading the rest.
 | What a slot **sounds** like | `lib/audio/perform.ts` | One function. Fingerpicking, per-string plucks and drum sounds all go here. |
 | **When** things happen | `lib/audio/transport.ts` | Lookahead scheduler. Don't move timing into React. |
 | The **synth** itself | `lib/audio/engine.ts` | Karplus-Strong. `pluck`, `strum`, `click`. Also owns the audio graph and the duck node. |
+| **Sound diagnostics** | `/soundcheck` (hidden route) | Measures the master bus: every tone audible, loudness parity, clipping, mute paths, click scheduling. Run it after touching the audio graph. |
+| Bus **volume/duck glides** | `glide()` in `lib/audio/engine.ts` | Never use `setTargetAtTime` for control buses — it never lands and leaves a −23 dB ghost at "zero". Linear ramp only. |
+| Per-instrument **loudness** | `trim` in `lib/audio/samples/index.ts` | Measured values; keep abs peak < 0.9 at the bus. |
 | **Sampled** guitar playback | `lib/audio/sampler.ts` | Real recordings. Voice stealing lives here. |
 | Add a sampled **instrument** | `scripts/build-samples.py`, then `lib/audio/samples/index.ts` | Two steps, nothing else. Per-instrument note maps are generated — do not hand-edit. Non-FLAC sources are transcoded automatically. |
 | **Licensing** of the audio | `public/samples/<id>/SOURCE.txt` | Per-instrument, and it differs: the steel-string is GPL-3, the other two are CC0. Don't write one blanket statement. |

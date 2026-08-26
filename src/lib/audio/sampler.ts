@@ -128,7 +128,7 @@ export class GuitarSampler {
     src.playbackRate.value = Math.pow(2, (midi - centre) / 12);
 
     const gain = ctx.createGain();
-    const peak = (opts.gain ?? 0.7) * (damping > 0.5 ? 0.5 : 1);
+    const peak = (opts.gain ?? 0.7) * INSTRUMENTS[instrument].trim * (damping > 0.5 ? 0.5 : 1);
     gain.gain.setValueAtTime(0, at);
     // A short ramp rather than a hard start: an instantaneous jump to full
     // gain on a recorded attack produces an audible click.

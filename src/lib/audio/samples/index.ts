@@ -31,6 +31,16 @@ export interface Instrument {
   licence: string;
   /** MIDI note -> pitch centre of the recording covering it. */
   notes: Record<number, number>;
+  /**
+   * Playback gain for this instrument's samples.
+   *
+   * The recordings are peak-normalised, so six strings summing coherently at
+   * a strum attack drove the master well past full scale — measured at the
+   * bus: acoustic 1.63, classical 1.10, electric 1.22 against a ceiling of
+   * 1.0, i.e. audible clipping on every open strum. These values bring each
+   * tone to roughly the synth's loudness (~0.2 RMS) with peaks under 0.8.
+   */
+  trim: number;
 }
 
 export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
@@ -41,6 +51,7 @@ export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
     credit: "FreePats FS Seagull steel-string, from samples by Gary Campion (FlameStudios), 2008",
     licence: "GPL-3.0-or-later",
     notes: ACOUSTIC_NOTES,
+    trim: 0.36,
   },
   classical: {
     id: "classical",
@@ -49,6 +60,7 @@ export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
     credit: "FreePats Spanish classical guitar, recorded by roberto@zenvoid.org, 2008",
     licence: "CC0 1.0",
     notes: CLASSICAL_NOTES,
+    trim: 0.62,
   },
   electric: {
     id: "electric",
@@ -57,6 +69,7 @@ export const INSTRUMENTS: Record<InstrumentId, Instrument> = {
     credit: "FreePats Electric Guitar FSBS (clean), direct-sampled Fender",
     licence: "CC0 1.0",
     notes: ELECTRIC_NOTES,
+    trim: 0.6,
   },
 };
 

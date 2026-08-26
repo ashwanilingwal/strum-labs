@@ -41,6 +41,7 @@ export interface PluckOptions {
 export class AudioEngine {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private limiter: DynamicsCompressorNode | null = null;
   private bus: AudioNode | null = null;
   /** Samples bypass the body EQ — the recording already contains a guitar. */
   private sampleBus: GainNode | null = null;
@@ -68,6 +69,15 @@ export class AudioEngine {
     return this.ctx?.currentTime ?? 0;
   }
 
+  /**
+   * The master bus — everything audible passes through it. Exists so
+   * diagnostics (and a future level meter) can tap the mix with an analyser;
+   * null before init().
+   */
+  get output(): AudioNode | null {
+    return this.limiter;
+  }
+
   get tone(): Tone {
     return this._tone;
   }
@@ -86,7 +96,20 @@ export class AudioEngine {
     const ctx = this.ctx!;
     this.master = ctx.createGain();
     this.master.gain.value = this._volume;
-    this.master.connect(ctx.destination);
+
+    // A near-limiter after the volume control, as a safety net rather than an
+    // effect: the trims keep normal playback under it, but nothing upstream
+    // can guarantee every future combination of voices sums below full scale,
+    // and the DAC's hard clamp is the worst-sounding limiter there is.
+    this.limiter = ctx.createDynamicsCompressor();
+    this.limiter.threshold.value = -3;
+    this.limiter.knee.value = 3;
+    this.limiter.ratio.value = 20;
+    this.limiter.attack.value = 0.001;
+    this.limiter.release.value = 0.08;
+
+    this.master.connect(this.limiter);
+    this.limiter.connect(ctx.destination);
 
     // A gentle body resonance so the raw string doesn't sound like a sine sweep.
     const body = ctx.createBiquadFilter();
@@ -143,9 +166,27 @@ export class AudioEngine {
     return isInstrument(this._tone) && (this.sampler?.ready(this._tone) ?? false);
   }
 
+  /**
+   * Move a control bus smoothly but land it exactly.
+   *
+   * The obvious tool is setTargetAtTime, and it is wrong for controls: the
+   * exponential never reaches its target, and measured at the master bus it
+   * left a -23 dB ghost of the metronome audible with the click volume at
+   * zero. A short linear ramp is equally free of zipper noise and terminates.
+   * (Per-note fade-outs keep setTargetAtTime — their sources are stopped
+   * moments later, which truncates the tail.)
+   */
+  private glide(param: AudioParam, v: number) {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    param.cancelScheduledValues(t);
+    param.setValueAtTime(param.value, t);
+    param.linearRampToValueAtTime(v, t + 0.05);
+  }
+
   setVolume(v: number) {
     this._volume = clamp01(v);
-    if (this.master && this.ctx) this.master.gain.setTargetAtTime(this._volume, this.ctx.currentTime, 0.02);
+    if (this.master) this.glide(this.master.gain, this._volume);
   }
 
   get volume() {
@@ -154,7 +195,7 @@ export class AudioEngine {
 
   setClickVolume(v: number) {
     this._clickVolume = clamp01(v);
-    if (this.clickBus && this.ctx) this.clickBus.gain.setTargetAtTime(this._clickVolume, this.ctx.currentTime, 0.02);
+    if (this.clickBus) this.glide(this.clickBus.gain, this._clickVolume);
   }
 
   get clickVolume() {
@@ -173,7 +214,7 @@ export class AudioEngine {
    */
   setGuitarDuck(ducked: boolean) {
     if (!this.ctx) return;
-    this.guitarGain?.gain.setTargetAtTime(ducked ? 0 : 1, this.ctx.currentTime, 0.02);
+    if (this.guitarGain) this.glide(this.guitarGain.gain, ducked ? 0 : 1);
   }
 
   /** Render (and cache) one plucked string. */
