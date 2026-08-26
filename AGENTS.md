@@ -88,33 +88,39 @@ Break these and things fail in ways that are hard to trace back.
    are what makes "38 ms late" a true statement.
 6. **`slotsPerBar` is a field, not a constant.** The editor offers eighths, but
    4/12/16 already work end to end. Don't hardcode 8.
-7. **Controls that would invalidate a take are locked while the transport
+7. **Status never replaces content.** A prominent slot holds one kind of
+   thing. When detection drops out, keep the last value and dim it; put
+   liveness in a small pill at the side. The tuner used to swap its big string
+   letter for "listening" between plucks, and the play screen swapped the chord
+   for the count-in number — removing the shape you need exactly when you are
+   getting your fingers onto it.
+8. **Controls that would invalidate a take are locked while the transport
    runs** — the mode toggle and the nav links. They explain why rather than
    just going dead. The transport itself and chord changes stay live: you must
    always be able to stop, and changing a chord mid-loop is a feature.
-8. **Never drive the UI loop from requestAnimationFrame.** rAF does not fire
+9. **Never drive the UI loop from requestAnimationFrame.** rAF does not fire
    while the page is hidden, backgrounded or throttled, but the transport keeps
    scheduling on the audio clock — so the playhead freezes over a running
    metronome and the app looks dead. `useStrumEngine` uses a 25ms interval.
    Nothing there is per-frame animation.
-9. **Stepper buttons resolve against the store, not a render-time value.**
+10. **Stepper buttons resolve against the store, not a render-time value.**
    `setBpm(bpm + 1)` loses increments when clicks land faster than React
    re-renders. Use `nudgeBpm(delta)`.
-10. **The play screen is an app shell, not a long page.** Fixed-height column:
+11. **The play screen is an app shell, not a long page.** Fixed-height column:
    nav, one scrolling region, transport in flow at the bottom. Do not make the
    transport sticky again — that needs a spacer matching its height, and
    measuring it depends on `resize` / `ResizeObserver`, which some embedded
    browser contexts never fire. The bug is silent: the spacer stays zero and
    the lane becomes unreachable.
-11. **Nothing is gated behind sign-in.** localStorage is the working copy;
+12. **Nothing is gated behind sign-in.** localStorage is the working copy;
    an account only adds sync.
-12. **Check 320px before calling a layout done.** It is where the transport
+13. **Check 320px before calling a layout done.** It is where the transport
    wraps to three rows and where wide letter-spacing stops fitting.
-8. **One voice per string.** Samples ring for up to 5 seconds; without the
+14. **One voice per string.** Samples ring for up to 5 seconds; without the
    voice stealing in `sampler.ts` and `engine.ts`, a bar of eighths stacks ~48
    simultaneous notes into mush. Re-striking a string must damp the last one.
-9. **Sampled tones fall back to the synth, never to silence.** A failed
+15. **Sampled tones fall back to the synth, never to silence.** A failed
    download must not leave a practice tool with no sound.
-10. **The click never gets ducked with the guitar.** It sits outside
+16. **The click never gets ducked with the guitar.** It sits outside
    `guitarGain` in the audio graph on purpose — muting the guitar for the mic
    must not take the metronome with it.

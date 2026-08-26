@@ -219,6 +219,18 @@ export function StrumLab() {
       */}
       <section className={`relative px-4 sm:px-8 sm:py-8 ${showVerdicts ? "py-2" : "py-5"}`}>
         <MotifField density={0.5} />
+
+        {/* Status sits at the side; it never takes the centre slot. */}
+        {engine.countIn > 0 ? (
+          <div
+            className="absolute right-4 top-2 z-10 flex items-center gap-2 rounded-full border border-line px-3 py-1.5 sm:right-8 sm:top-4"
+            role="status"
+            aria-label={`Starting in ${engine.countIn}`}
+          >
+            <span className="caps text-fg-dim">in</span>
+            <span className="num text-xl leading-none text-accent">{engine.countIn}</span>
+          </div>
+        ) : null}
         <div className="wrap relative z-10 flex w-full flex-col items-center gap-4">
           <div className="flex w-full items-center justify-center gap-4 sm:gap-10">
             <div className="min-w-0 text-center">
@@ -229,32 +241,28 @@ export function StrumLab() {
                     ? `Bar ${bar + 1} of ${pattern.bars}`
                     : "Ready"}
               </p>
-              {engine.countIn > 0 ? (
-                <ChromeText className="mt-1 block text-[clamp(4.25rem,13vw,8rem)]">
-                  {String(engine.countIn)}
-                </ChromeText>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setChordSheetBar(bar)}
-                  className="block rounded-2xl transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
-                  aria-label={`Change the chord for bar ${bar + 1}`}
+              {/* The chord holds this slot unconditionally. It used to be
+                  swapped for the count-in number, which removed the one thing
+                  you need during a count-in — the shape to get your fingers
+                  onto. The count lives beside it now. */}
+              <button
+                type="button"
+                onClick={() => setChordSheetBar(bar)}
+                className="block rounded-2xl transition hover:opacity-80 focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent"
+                aria-label={`Change the chord for bar ${bar + 1}`}
+              >
+                <ChromeText
+                  className={`mt-1 block ${
+                    showVerdicts
+                      ? "text-[clamp(2.5rem,9vw,8rem)]"
+                      : "text-[clamp(4.25rem,13vw,8rem)]"
+                  }`}
                 >
-                  <ChromeText
-                    className={`mt-1 block ${
-                      showVerdicts
-                        ? "text-[clamp(2.5rem,9vw,8rem)]"
-                        : "text-[clamp(4.25rem,13vw,8rem)]"
-                    }`}
-                  >
-                    {chord?.symbol ?? "\u2014"}
-                  </ChromeText>
-                </button>
-              )}
+                  {chord?.symbol ?? "\u2014"}
+                </ChromeText>
+              </button>
               <div className="mt-1.5 flex items-center justify-center gap-2">
-                <p className="caps-lg text-fg">
-                  {engine.countIn > 0 ? "Get ready" : chord?.name}
-                </p>
+                <p className="caps-lg text-fg">{chord?.name}</p>
                 {engine.countIn === 0 ? (
                   // The big chord is already a button, but nothing said so.
                   // A control that only works if you guess it is there is not

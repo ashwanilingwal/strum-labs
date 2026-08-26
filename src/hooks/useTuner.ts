@@ -53,6 +53,13 @@ export function useTuner() {
   const [status, setStatus] = useState<TunerStatus>("off");
   const [message, setMessage] = useState<string | null>(null);
   const [hz, setHz] = useState<number | null>(null);
+  /**
+   * The last pitch ever accepted, surviving signal loss and stop(). The UI
+   * keeps the centre display on this, dimmed, rather than swapping the most
+   * prominent thing on screen for a status message every time the note decays
+   * between plucks.
+   */
+  const [lastHz, setLastHz] = useState<number | null>(null);
   const [clarity, setClarity] = useState(0);
 
   const captureRef = useRef<MicCapture | null>(null);
@@ -122,6 +129,7 @@ export function useTuner() {
           const median = sorted[sorted.length >> 1];
           heldHzRef.current = median;
           setHz(median);
+          setLastHz(median);
           setClarity(accepted.clarity);
           return;
         }
@@ -146,5 +154,5 @@ export function useTuner() {
 
   useEffect(() => () => captureRef.current?.stop(), []);
 
-  return { status, message, hz, clarity, start, stop };
+  return { status, message, hz, lastHz, clarity, start, stop };
 }
