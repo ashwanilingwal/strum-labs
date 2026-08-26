@@ -1,13 +1,13 @@
 "use client";
 
-import { useMemo, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import {
-  emptyPattern, handDirection, newPatternId, type Pattern, type Stroke,
+  emptyPattern, handDirection, loopSeconds, newPatternId, type Pattern, type Stroke,
 } from "@/lib/music/pattern";
 import { appStore, QUICK_ID, type AppState } from "@/lib/storage/settings";
 import { touchLocal } from "@/hooks/useAccount";
-import { previewPattern } from "@/lib/audio/preview";
+import { previewPattern, stopPreview } from "@/lib/audio/preview";
 import { PlayCorner } from "./PlayCorner";
 
 /**
@@ -38,6 +38,25 @@ export function PatternsTab() {
   const router = useRouter();
   const [barsFilter, setBarsFilter] = useState<number | null>(null);
   const [chordFilter, setChordFilter] = useState<string>("all");
+  /** Which card is previewing, so its corner shows a stop. */
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const togglePreview = (p: Pattern) => {
+    if (previewTimer.current) clearTimeout(previewTimer.current);
+    if (previewingId === p.id) {
+      stopPreview();
+      setPreviewingId(null);
+      return;
+    }
+    void previewPattern(p);
+    setPreviewingId(p.id);
+    // The preview announces its own end; the state just has to keep up.
+    previewTimer.current = setTimeout(
+      () => setPreviewingId((cur) => (cur === p.id ? null : cur)),
+      loopSeconds(p, p.bpm) * 1000 + 400,
+    );
+  };
 
   const setState = (updater: (prev: AppState) => AppState) => {
     appStore.set(updater);
@@ -108,9 +127,9 @@ export function PatternsTab() {
           <article
             key={p.id}
             className="card-flat block-light relative p-5"
-            onClick={() => void previewPattern(p)}
+            onClick={() => togglePreview(p)}
           >
-            <PlayCorner label={`Hear ${p.name}`} onClick={() => void previewPattern(p)} />
+            <PlayCorner label={`Hear ${p.name}`} playing={previewingId === p.id} onClick={() => togglePreview(p)} />
             <div className="flex flex-wrap items-baseline justify-between gap-2 pr-8">
               <h2 className="font-display text-2xl leading-none text-chrome-700">{p.name}</h2>
               <span className="caps text-fg-dim">{p.chords.join(" · ")} · {p.bpm} bpm</span>

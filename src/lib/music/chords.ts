@@ -65,7 +65,34 @@ export const CHORDS: Chord[] = [
   { id: "Bm", symbol: "Bm", name: "B minor", frets: [-1, 2, 4, 4, 3, 2], fingers: [0, 1, 3, 4, 2, 1], baseFret: 1, barre: { fret: 2, from: 1, to: 5, finger: 1 }, tier: "barre", tip: "Am shape barred at the 2nd fret. Skip the low E entirely." },
   { id: "Bb", symbol: "Bb", name: "B flat major", frets: [-1, 1, 3, 3, 3, 1], fingers: [0, 1, 2, 3, 4, 1], baseFret: 1, barre: { fret: 1, from: 1, to: 5, finger: 1 }, tier: "barre", tip: "The A shape barred at the 1st fret." },
   { id: "F#m", symbol: "F#m", name: "F sharp minor", frets: [2, 4, 4, 2, 2, 2], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barre: { fret: 2, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "Em shape barred at the 2nd fret. The relative minor of A." },
+  // ---- more barre shapes: the movable families across common roots ----
+  { id: "B", symbol: "B", name: "B major", frets: [-1, 2, 4, 4, 4, 2], fingers: [0, 1, 2, 3, 4, 1], baseFret: 1, barre: { fret: 2, from: 1, to: 5, finger: 1 }, tier: "barre", tip: "The A shape moved up two frets. The barre's tip mutes the low E for you." },
+  { id: "F#", symbol: "F#", name: "F sharp major", frets: [2, 4, 4, 3, 2, 2], fingers: [1, 3, 4, 2, 1, 1], baseFret: 1, barre: { fret: 2, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "The E shape barred at the 2nd fret. If F works, this works." },
+  { id: "Fm", symbol: "Fm", name: "F minor", frets: [1, 3, 3, 1, 1, 1], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barre: { fret: 1, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "Em shape at the 1st fret. One finger fewer than F major." },
+  { id: "Gm", symbol: "Gm", name: "G minor", frets: [3, 5, 5, 3, 3, 3], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barre: { fret: 3, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "Em shape at the 3rd fret. Higher up, the frets get closer and kinder." },
+  { id: "G#m", symbol: "G#m", name: "G sharp minor", frets: [4, 6, 6, 4, 4, 4], fingers: [1, 3, 4, 1, 1, 1], baseFret: 1, barre: { fret: 4, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "Em shape at the 4th fret. The relative minor of B." },
+  { id: "Cm", symbol: "Cm", name: "C minor", frets: [-1, 3, 5, 5, 4, 3], fingers: [0, 1, 3, 4, 2, 1], baseFret: 1, barre: { fret: 3, from: 1, to: 5, finger: 1 }, tier: "barre", tip: "Am shape at the 3rd fret. Skip the low E entirely." },
+  { id: "C#m", symbol: "C#m", name: "C sharp minor", frets: [-1, 4, 6, 6, 5, 4], fingers: [0, 1, 3, 4, 2, 1], baseFret: 1, barre: { fret: 4, from: 1, to: 5, finger: 1 }, tier: "barre", tip: "Am shape at the 4th fret. Everywhere in pop, straight after an E." },
+  { id: "F7", symbol: "F7", name: "F dominant 7th", frets: [1, 3, 1, 2, 1, 1], fingers: [1, 3, 1, 2, 1, 1], baseFret: 1, barre: { fret: 1, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "E7 shape barred. Bluesier and slightly easier than the full F." },
+  { id: "F#m7", symbol: "F#m7", name: "F sharp minor 7th", frets: [2, 4, 2, 2, 2, 2], fingers: [1, 3, 1, 1, 1, 1], baseFret: 1, barre: { fret: 2, from: 0, to: 5, finger: 1 }, tier: "barre", tip: "Em7 shape barred at the 2nd. Two fingers, big sound." },
+
+  // ---- more open sevenths and colour ----
+  { id: "Bm7", symbol: "Bm7", name: "B minor 7th", frets: [-1, 2, 0, 2, 0, 2], fingers: [0, 1, 0, 2, 0, 3], baseFret: 1, tier: "open", tip: "The friendly stand-in for Bm — no barre, airy open strings." },
+  { id: "Amaj7", symbol: "Amaj7", name: "A major 7th", frets: [-1, 0, 2, 1, 2, 0], fingers: [0, 0, 2, 1, 3, 0], baseFret: 1, tier: "colour", tip: "A with the lights dimmed. Gorgeous before a D." },
+  { id: "Dmaj7", symbol: "Dmaj7", name: "D major 7th", frets: [-1, -1, 0, 2, 2, 2], fingers: [0, 0, 0, 1, 2, 3], baseFret: 1, tier: "colour", tip: "One flat finger can barre all three. Summer in a chord." },
+  { id: "Gmaj7", symbol: "Gmaj7", name: "G major 7th", frets: [3, 2, 0, 0, 0, 2], fingers: [2, 1, 0, 0, 0, 3], baseFret: 1, tier: "colour", tip: "G with the top softened. Try it where a G feels too plain." },
+  { id: "A7sus4", symbol: "A7sus4", name: "A 7th suspended 4th", frets: [-1, 0, 2, 0, 3, 0], fingers: [0, 0, 2, 0, 3, 0], baseFret: 1, tier: "colour", tip: "Two fingers and endless suspension. The classic intro-riff chord." },
+
+  // ---- slash chords: same chords, different floor ----
+  { id: "D/F#", symbol: "D/F#", name: "D over F sharp", frets: [2, 0, 0, 2, 3, 2], fingers: [1, 0, 0, 2, 4, 3], baseFret: 1, tier: "colour", tip: "D with F# underneath — many players hook the thumb over for the bass." },
+  { id: "G/B", symbol: "G/B", name: "G over B", frets: [-1, 2, 0, 0, 3, 3], fingers: [0, 1, 0, 0, 3, 4], baseFret: 1, tier: "colour", tip: "The walking step between C and Am. Bass lines love it." },
+  { id: "C/G", symbol: "C/G", name: "C over G", frets: [3, 3, 2, 0, 1, 0], fingers: [3, 4, 2, 0, 1, 0], baseFret: 1, tier: "colour", tip: "C with a G floor. Fuller than plain C when it ends a song." },
+
   // ---- power ----
+  { id: "G5", symbol: "G5", name: "G power chord", frets: [3, 5, 5, -1, -1, -1], fingers: [1, 3, 4, 0, 0, 0], baseFret: 1, tier: "colour", tip: "The movable two-finger shape. Slide it anywhere and it keeps its name." },
+  { id: "C5", symbol: "C5", name: "C power chord", frets: [-1, 3, 5, 5, -1, -1], fingers: [0, 1, 3, 4, 0, 0], baseFret: 1, tier: "colour", tip: "Same shape, A-string root. Mute the rest with lazy fingers." },
+  { id: "D5", symbol: "D5", name: "D power chord", frets: [-1, 5, 7, 7, -1, -1], fingers: [0, 1, 3, 4, 0, 0], baseFret: 1, tier: "colour", tip: "Further up the same rails. Watch the diagram's fret marker." },
+
   { id: "E5", symbol: "E5", name: "E power chord", frets: [0, 2, 2, -1, -1, -1], fingers: [0, 1, 2, 0, 0, 0], baseFret: 1, tier: "colour", tip: "Neither happy nor sad. Distortion's favourite." },
   { id: "A5", symbol: "A5", name: "A power chord", frets: [-1, 0, 2, 2, -1, -1], fingers: [0, 0, 1, 2, 0, 0], baseFret: 1, tier: "colour", tip: "Two notes. Mute everything you aren't playing." },
 ];

@@ -19,9 +19,21 @@ import { ExercisesTab } from "./ExercisesTab";
  */
 
 const TABS = [
-  { id: "chords", label: "Chords" },
-  { id: "patterns", label: "Patterns" },
-  { id: "exercises", label: "Exercises" },
+  {
+    id: "chords",
+    label: "Chords",
+    blurb: "Every shape, with fingerings and tips. Tap a card to hear it, or send it to practice.",
+  },
+  {
+    id: "patterns",
+    label: "Patterns",
+    blurb: "Your strumming patterns. Filter them, hear them, take one to the metronome.",
+  },
+  {
+    id: "exercises",
+    label: "Exercises",
+    blurb: "A graded path — first sounds to speed work. Drills, technique, and listening games.",
+  },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -51,20 +63,35 @@ function LearnInner() {
         </div>
       </header>
 
-      <div className="sticky top-0 z-10 border-y border-line bg-ink/95 px-4 py-2.5 backdrop-blur sm:px-8">
-        <div className="wrap flex gap-2" role="tablist" aria-label="Learn sections">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => switchTo(t.id)}
-              className={`btn !px-4 !py-1.5 ${tab === t.id ? "btn-lit" : ""}`}
-            >
-              {t.label}
-            </button>
-          ))}
+      {/* Three tiles, not three plain buttons: a newcomer should be able to
+          tell what lives behind each before committing a tap. */}
+      <div className="px-4 pb-4 sm:px-8">
+        <div className="wrap grid gap-2 sm:grid-cols-3" role="tablist" aria-label="Learn sections">
+          {TABS.map((t) => {
+            const active = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => switchTo(t.id)}
+                className="rounded-2xl border p-4 text-left transition"
+                style={{
+                  borderColor: active ? "var(--accent)" : "var(--line)",
+                  background: active ? "rgba(95,210,242,0.08)" : "transparent",
+                }}
+              >
+                <span
+                  className="font-display block text-xl leading-tight"
+                  style={{ color: active ? "var(--accent)" : "var(--fg)" }}
+                >
+                  {t.label}
+                </span>
+                <span className="mt-1 block text-xs leading-relaxed text-fg-dim">{t.blurb}</span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

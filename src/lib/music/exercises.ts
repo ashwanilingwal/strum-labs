@@ -15,6 +15,13 @@ import { buildChordDrill, buildPattern, STRUM_STYLES } from "./library";
 import type { Pattern } from "./pattern";
 import type { Song, SongBar, PickStep } from "./songs";
 
+/** One target in a listening game: a note named by where it lives. */
+export interface NoteTarget {
+  string: number;
+  fret: number;
+  name: string;
+}
+
 export interface Exercise {
   id: string;
   title: string;
@@ -25,11 +32,13 @@ export interface Exercise {
   coaching: string;
   /** When to consider it learned and move on. */
   goal: string;
-  kind: "strum" | "pick";
+  kind: "strum" | "pick" | "notes";
   /** Strum drills load into the practice screen. */
   pattern?: Pattern;
   /** Technique drills play inline on the song machinery. */
   song?: Song;
+  /** Listening games: play each target at your own pace; the mic confirms. */
+  notes?: NoteTarget[];
 }
 
 export const LEVELS = [
@@ -81,6 +90,23 @@ export const EXERCISES: Exercise[] = [
       [{ string: 4 }, rest, { string: 5 }, rest, { string: 4 }, rest, { string: 3 }, rest],
       [{ string: 2 }, rest, { string: 1 }, rest, { string: 0 }, rest, rest, rest],
     ]),
+  },
+
+  {
+    id: "open-strings",
+    title: "Name the open strings",
+    level: 0, focus: "right hand", kind: "notes",
+    coaching:
+      "The game shows a string; you play it open and let it ring. No timer, no rush — the microphone confirms each one and moves you on. E-A-D-G-B-E is the alphabet everything else is written in.",
+    goal: "All six strings, twice through, without looking at your pick hand.",
+    notes: [
+      { string: 0, fret: 0, name: "E" }, { string: 1, fret: 0, name: "A" },
+      { string: 2, fret: 0, name: "D" }, { string: 3, fret: 0, name: "G" },
+      { string: 4, fret: 0, name: "B" }, { string: 5, fret: 0, name: "E" },
+      { string: 5, fret: 0, name: "E" }, { string: 4, fret: 0, name: "B" },
+      { string: 3, fret: 0, name: "G" }, { string: 2, fret: 0, name: "D" },
+      { string: 1, fret: 0, name: "A" }, { string: 0, fret: 0, name: "E" },
+    ],
   },
 
   // ---- Level 1: Rhythm foundations ---------------------------------------
@@ -148,6 +174,33 @@ export const EXERCISES: Exercise[] = [
       [{ string: 1, art: "hammer", fromFret: 0 }, rest, { string: 1, art: "pull", fromFret: 0 }, rest, { string: 1, art: "hammer", fromFret: 0 }, rest, { string: 1, art: "pull", fromFret: 0 }, rest],
       [{ string: 2, art: "hammer", fromFret: 0 }, rest, { string: 2, art: "pull", fromFret: 0 }, rest, { string: 2, art: "hammer", fromFret: 0 }, rest, { string: 2, art: "pull", fromFret: 0 }, rest],
     ]),
+  },
+
+  {
+    id: "notes-low-e",
+    title: "Notes on the low E",
+    level: 2, focus: "left hand", kind: "notes",
+    coaching:
+      "Fret the note the game asks for, pick it, let it ring until it registers. Your own pace. Knowing the low E string by name is how barre chords stop being guesswork.",
+    goal: "F, G and A found without counting frets from the top.",
+    notes: [
+      { string: 0, fret: 1, name: "F" }, { string: 0, fret: 3, name: "G" },
+      { string: 0, fret: 5, name: "A" }, { string: 0, fret: 3, name: "G" },
+      { string: 0, fret: 1, name: "F" }, { string: 0, fret: 5, name: "A" },
+    ],
+  },
+  {
+    id: "notes-a-string",
+    title: "Notes on the A string",
+    level: 2, focus: "left hand", kind: "notes",
+    coaching:
+      "Same game, next string up. C, D and E on the A string are the roots of half the barre chords you will ever play.",
+    goal: "C, D and E found cold, in any order the game deals them.",
+    notes: [
+      { string: 1, fret: 3, name: "C" }, { string: 1, fret: 5, name: "D" },
+      { string: 1, fret: 7, name: "E" }, { string: 1, fret: 5, name: "D" },
+      { string: 1, fret: 3, name: "C" }, { string: 1, fret: 7, name: "E" },
+    ],
   },
 
   // ---- Level 3: Right hand ------------------------------------------------
