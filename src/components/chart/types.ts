@@ -30,6 +30,13 @@ export const PLUCK_LABEL: Record<PluckFinger, string> = {
 export interface ChartOverlay {
   /** String indices (0 = low E) sounding right now. */
   sounding?: number[];
+  /**
+   * Strings confirmed in tune — drawn green with a tick above the nut.
+   *
+   * Transient in the same sense as the rest of this type: it is a fact about
+   * this tuning session, not about the shape. The tuner is its first user.
+   */
+  tuned?: number[];
   /** Which right-hand finger plucks which string. */
   pluck?: Partial<Record<number, PluckFinger>>;
   /** Strings deliberately damped on top of the chord's own muted strings. */

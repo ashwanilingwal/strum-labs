@@ -251,7 +251,7 @@ export function SettingsPanel({
                         background:
                           room.quality === "quiet" ? "var(--tight)"
                             : room.quality === "usable" ? "var(--close)"
-                            : "var(--loose)",
+                            : "var(--loose)", // noisy and silent both mean "act on this"
                       }}
                     />
                     <span className="text-sm font-semibold capitalize">{room.quality} room</span>

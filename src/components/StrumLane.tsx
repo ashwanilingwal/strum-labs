@@ -4,7 +4,7 @@ import {
   countLabels, handDirection, type Pattern, type Stroke,
 } from "@/lib/music/pattern";
 import type { SlotVerdict } from "@/lib/listen/scoring";
-import { signedMs, verdictVisual } from "@/lib/feedback/presentation";
+import { signedMs, verdictVisualFor } from "@/lib/feedback/presentation";
 
 /**
  * The pattern as a lane of slots, with the playhead and — when the mic is on —
@@ -36,7 +36,20 @@ export function StrumLane({
 
   return (
     <div className="flex gap-2 overflow-x-auto pb-1">
-      {Array.from({ length: pattern.bars }, (_, bar) => (
+      {Array.from({ length: pattern.bars }, (_, bar) => {
+        // The bar's chord verdict, aggregated across this cycle's strums:
+        // single strums often abstain (the matcher only speaks when sure),
+        // but a bar holds several strums of the same chord, and together
+        // they usually add up to an answer worth showing.
+        const barVerdicts = showVerdicts
+          ? Array.from({ length: pattern.slotsPerBar }, (_, i) => verdicts[bar * pattern.slotsPerBar + i])
+              .filter((v): v is SlotVerdict => v !== undefined)
+          : [];
+        const chordRight = barVerdicts.filter((v) => v.chordOk === true).length;
+        const chordWrong = barVerdicts.filter((v) => v.chordOk === false).length;
+        const barChord =
+          chordWrong > chordRight ? "wrong" : chordRight > 0 ? "right" : null;
+        return (
         <div
           key={bar}
           className="min-w-0 flex-1"
@@ -52,6 +65,15 @@ export function StrumLane({
               bar {bar + 1}
             </span>
             <span className="font-display text-xs font-bold text-accent">{pattern.chords[bar]}</span>
+            {barChord ? (
+              <span
+                className="font-display text-xs font-bold"
+                style={{ color: barChord === "right" ? "var(--tight)" : "var(--extra)" }}
+                title={barChord === "right" ? "Chord confirmed this loop" : "Hearing a different chord this loop"}
+              >
+                {barChord === "right" ? "✓" : "≠"}
+              </span>
+            ) : null}
           </div>
           <div
             className="grid gap-1"
@@ -62,7 +84,7 @@ export function StrumLane({
               const stroke = pattern.strokes[index];
               const active = index === activeSlot;
               const verdict = showVerdicts ? verdicts[index] : undefined;
-              const visual = verdict ? verdictVisual(verdict.grade, verdict.errorMs) : null;
+              const visual = verdict ? verdictVisualFor(verdict) : null;
               const dir = handDirection(pattern.slotsPerBar, pattern.beatsPerBar, index);
               return (
                 <div key={index} className="min-w-0">
@@ -121,7 +143,8 @@ export function StrumLane({
             })}
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }

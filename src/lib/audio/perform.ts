@@ -19,6 +19,8 @@ export interface PerformOptions {
   guitar: boolean;
   /** Play the metronome click. */
   click: boolean;
+  /** Play the synthesised drum groove under the pattern. */
+  backing?: boolean;
 }
 
 /** True when this slot falls on a beat, i.e. where the metronome ticks. */
@@ -45,6 +47,19 @@ export function performSlot(
 ): void {
   if (opts.click && isBeatSlot(pattern, slot)) {
     engine.click(time, isBarStart(pattern, slot));
+  }
+
+  if (opts.backing) {
+    // The eternal rock beat: kick on the odd-numbered beats, snare answering
+    // on the even ones, hats on the eighths — enough groove to place the
+    // pattern against without competing with it. Works at any slotsPerBar.
+    const slotsPerBeat = pattern.slotsPerBar / pattern.beatsPerBar;
+    const inBar = slot % pattern.slotsPerBar;
+    if (inBar % slotsPerBeat === 0) {
+      engine.drum(time, Math.floor(inBar / slotsPerBeat) % 2 === 0 ? "kick" : "snare");
+    }
+    const eighth = Math.max(1, Math.floor(slotsPerBeat / 2));
+    if (inBar % eighth === 0) engine.drum(time, "hat");
   }
 
   const stroke = pattern.strokes[slot];

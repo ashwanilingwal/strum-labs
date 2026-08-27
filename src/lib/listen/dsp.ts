@@ -6,7 +6,7 @@
  * single-note work later.
  */
 
-import { pitchClassOf, freqToMidi } from "../music/theory";
+import { midiToFreq, pitchClassOf, freqToMidi } from "../music/theory";
 
 /** Guitar-relevant band. Below this is rumble; above it is mostly noise. */
 export const MIN_HZ = 70;
@@ -43,6 +43,13 @@ export function spectralFlux(cur: Float32Array, prev: Float32Array, loBin: numbe
     if (d > 0) flux += d;
   }
   return flux;
+}
+
+/** Summed magnitude across a bin range — how much is sounding in that band. */
+export function bandEnergy(mag: Float32Array, loBin: number, hiBin: number): number {
+  let sum = 0;
+  for (let i = loBin; i < hiBin; i++) sum += mag[i];
+  return sum;
 }
 
 /** Energy-weighted mean frequency. Bright sounds sit higher. */
@@ -91,6 +98,70 @@ export function chroma(mag: Float32Array, sampleRate: number, fftSize: number, o
     if (cents > 0.35) continue;
     const weight = 1 - cents / 0.35;
     out[pitchClassOf(nearest)] += m * weight;
+  }
+  return normalise(out);
+}
+
+/** Guitar range covered by the note-exact measurement: E2 up to D6. */
+export const NOTE_LOW_MIDI = 40;
+export const NOTE_HIGH_MIDI = 86;
+export const NOTE_BINS = NOTE_HIGH_MIDI - NOTE_LOW_MIDI + 1;
+
+/**
+ * Per-semitone energies measured in the time domain, not folded from FFT bins.
+ *
+ * The FFT chroma above is fine for flux but useless for chords: at
+ * FFT_SIZE 1024 a bin is 43 Hz wide, which in the guitar's low octaves is
+ * several semitones. Measured on a synthetic C major, E3 and G3 both landed
+ * in the bin centred at 172 Hz — which reads as F — so every chord matched
+ * whatever template most resembles "C plus a large phantom F" (2/52 correct,
+ * scripts/chord-match-eval.ts). Frequency resolution comes from window
+ * *length*, so this runs a Goertzel filter at each semitone's exact frequency
+ * over the ~120 ms window the deferred fingerprint provides: at that length
+ * the mainlobe is a few hertz wide and the low strings finally separate.
+ *
+ * Kept per-note rather than folded to pitch classes because the octave is
+ * where the hard distinctions live: C and Cmaj7 differ as C4 versus B3, and
+ * folding turns that into "C-ish with some B" — which harmonics also produce.
+ *
+ * Returned RAW (per-sample amplitude scale, not unit norm) so two windows can
+ * be compared or subtracted — the detector subtracts the pre-attack window
+ * from the post-attack one to remove the previous chord's ring-over.
+ * Normalise before matching.
+ *
+ * ~47 filters over a few thousand samples, once per detected strum — cheap.
+ */
+export function noteEnergies(samples: Float32Array, sampleRate: number, out: Float32Array): Float32Array {
+  out.fill(0);
+  const n = samples.length;
+  if (n < 256) return out;
+  const windowed = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    windowed[i] = samples[i] * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (n - 1)));
+  }
+  for (let midi = NOTE_LOW_MIDI; midi <= NOTE_HIGH_MIDI; midi++) {
+    const f = midiToFreq(midi);
+    if (f > sampleRate * 0.45) break;
+    const w = (2 * Math.PI * f) / sampleRate;
+    const coeff = 2 * Math.cos(w);
+    let s1 = 0;
+    let s2 = 0;
+    for (let i = 0; i < n; i++) {
+      const s0 = windowed[i] + coeff * s1 - s2;
+      s2 = s1;
+      s1 = s0;
+    }
+    const power = s1 * s1 + s2 * s2 - coeff * s1 * s2;
+    out[midi - NOTE_LOW_MIDI] = Math.sqrt(Math.max(0, power)) / n;
+  }
+  return out;
+}
+
+/** Fold per-note energies onto pitch classes, for display and diagnostics. */
+export function foldToChroma(energies: Float32Array, out: Float32Array): Float32Array {
+  out.fill(0);
+  for (let i = 0; i < energies.length; i++) {
+    out[pitchClassOf(NOTE_LOW_MIDI + i)] += energies[i];
   }
   return normalise(out);
 }

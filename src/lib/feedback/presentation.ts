@@ -34,11 +34,11 @@ export const GRADE_VISUALS: Record<Grade, GradeVisual> = {
   },
   close: {
     label: "Nearly", glyph: "\u2022", color: "var(--close)", className: "verdict-close",
-    coaching: "Close. Keep the strumming hand swinging evenly.",
+    coaching: "You're a little off \u2014 ease onto the click.",
   },
   loose: {
     label: "Out", glyph: "!", color: "var(--loose)", className: "verdict-loose",
-    coaching: "Well off the beat. Try it slower.",
+    coaching: "Well off the beat \u2014 drop the tempo and groove with the click.",
   },
   missed: {
     label: "Missed", glyph: "\u2715", color: "var(--fg-dim)", className: "verdict-missed",
@@ -51,12 +51,13 @@ export const GRADE_VISUALS: Record<Grade, GradeVisual> = {
 };
 
 /**
- * Per-strum feedback, worded the way a teacher would.
+ * Per-strum feedback, in plain words.
  *
- * "Rushing" and "dragging" are the real terms for playing ahead of and behind
- * the beat, and unlike "tight" or "loose" they say which way to correct. The
- * grade alone cannot express that — direction lives in the sign of the error —
- * so the label is derived from both.
+ * The grade alone cannot say which way to correct — direction lives in the
+ * sign of the error — so the label is derived from both. The coaching says
+ * "go slower / go faster" rather than the trade terms (rushing, dragging):
+ * a beginner should not need a glossary to act on a verdict (asked for
+ * explicitly, 2026-08-27).
  */
 export function verdictVisual(grade: Grade, errorMs: number): GradeVisual {
   const base = GRADE_VISUALS[grade];
@@ -67,16 +68,42 @@ export function verdictVisual(grade: Grade, errorMs: number): GradeVisual {
     ...base,
     glyph: early ? "\u00ab" : "\u00bb",
     label: grade === "close"
-      ? (early ? "Early" : "Late")
-      : (early ? "Way early" : "Way late"),
-    coaching: early
-      ? "You're ahead of the beat — let the click lead, don't chase it."
-      : "You're behind the beat — start the stroke a fraction earlier.",
+      ? (early ? "A touch early" : "A touch late")
+      : (early ? "Too early" : "Too late"),
+    coaching: grade === "close"
+      ? (early
+          ? "You're a little off — go a touch slower and let the click lead."
+          : "You're a little off — go a touch faster to meet the click.")
+      : (early
+          ? "You're ahead of the beat — go slower and wait for the click."
+          : "You're behind the beat — go faster, it has already landed."),
   };
 }
 
 export function gradeVisual(grade: Grade): GradeVisual {
   return GRADE_VISUALS[grade];
+}
+
+/**
+ * The visual for a whole verdict, chord check included.
+ *
+ * A confidently wrong chord OUTRANKS good timing: a green tick used to mean
+ * only "on the beat", and hitting the beat with the wrong chord still read
+ * as success (called out explicitly, 2026-08-27). When the chord checker
+ * abstains — below its confidence gate, or a muted chuck — the timing grade
+ * stands alone, which is honest: silence, not a guess, in both directions.
+ */
+export function verdictVisualFor(v: SlotVerdict): GradeVisual {
+  if (v.chordOk === false && v.grade !== "missed" && v.grade !== "extra") {
+    return {
+      label: "Wrong chord",
+      glyph: "≠",
+      color: "var(--extra)",
+      className: "verdict-extra",
+      coaching: "The timing landed, but that isn't the bar's chord — check your shape.",
+    };
+  }
+  return verdictVisual(v.grade, v.errorMs);
 }
 
 /** "12 ms early" / "bang on" / "40 ms late". */

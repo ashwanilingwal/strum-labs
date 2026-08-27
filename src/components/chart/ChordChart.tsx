@@ -55,6 +55,7 @@ export function ChordChart({
 
   const sounding = new Set(overlay?.sounding ?? []);
   const damped = new Set(overlay?.damped ?? []);
+  const tuned = new Set(overlay?.tuned ?? []);
 
   return (
     <svg
@@ -84,20 +85,42 @@ export function ChordChart({
 
       {Array.from({ length: STRINGS }, (_, s) => {
         const lit = sounding.has(s);
+        const settled = tuned.has(s);
+        const emphasis = lit || settled;
         return (
-          <line
-            key={`s${s}`}
-            x1={x(s)} x2={x(s)} y1={padTop} y2={padTop + h}
-            stroke={lit ? "var(--accent)" : "var(--fg-dim)"}
-            strokeWidth={(lit ? 1.8 : 0.6) + (STRINGS - 1 - s) * 0.22}
-            opacity={damped.has(s) ? 0.3 : lit ? 1 : 0.7}
-          />
+          <g key={`s${s}`}>
+            {/* A soft halo under a settled string, so "done" reads at a glance. */}
+            {settled ? (
+              <line
+                x1={x(s)} x2={x(s)} y1={padTop} y2={padTop + h}
+                stroke="var(--tight)" strokeWidth={5.5} opacity={0.22}
+              />
+            ) : null}
+            <line
+              x1={x(s)} x2={x(s)} y1={padTop} y2={padTop + h}
+              stroke={settled ? "var(--tight)" : lit ? "var(--accent)" : "var(--fg-dim)"}
+              strokeWidth={(emphasis ? 1.8 : 0.6) + (STRINGS - 1 - s) * 0.22}
+              opacity={damped.has(s) ? 0.3 : emphasis ? 1 : 0.7}
+            />
+          </g>
         );
       })}
 
-      {/* open / muted markers above the nut */}
+      {/* open / muted markers above the nut — a tuned string takes the slot
+          with a green tick, which is the whole point of the tuner's chart. */}
       {frets.map((fret, s) =>
-        fret === 0 ? (
+        tuned.has(s) ? (
+          <g key={`t${s}`}>
+            <circle cx={x(s)} cy={padTop - 13} r={5.8} fill="var(--tight)" />
+            <text
+              x={x(s)} y={padTop - 12.4}
+              textAnchor="middle" dominantBaseline="central"
+              fontSize={8} fontWeight={800} fill="var(--ink)"
+            >
+              ✓
+            </text>
+          </g>
+        ) : fret === 0 ? (
           <circle
             key={`o${s}`} cx={x(s)} cy={padTop - 13} r={3.6}
             fill={sounding.has(s) ? "var(--accent)" : "none"}

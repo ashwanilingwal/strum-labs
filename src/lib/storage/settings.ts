@@ -18,6 +18,8 @@ export const STORAGE_KEY = "strumlab:v1";
 export interface AudioSettings {
   guitar: boolean;
   click: boolean;
+  /** The synthesised drum groove under pattern practice. */
+  backing: boolean;
   volume: number;
   clickVolume: number;
   tone: Tone;
@@ -81,11 +83,21 @@ export interface AppState {
 export const DEFAULT_AUDIO: AudioSettings = {
   guitar: true,
   click: true,
+  backing: false,
   volume: 0.75,
-  clickVolume: 0.5,
+  // 0.5 buried the click under the guitar for most players (raised 2026-08-27).
+  clickVolume: 0.7,
   tone: "acoustic",
   countInBars: 1,
 };
+
+/**
+ * The click default moved 0.5 → 0.7. A stored 0.5 is almost always the old
+ * default rather than a choice — the slider was never the reason anyone opened
+ * settings — so it is lifted to the new default. Anyone who actually wants a
+ * quieter click sets it once more and any other value sticks forever.
+ */
+const OLD_CLICK_DEFAULT = 0.5;
 
 export const DEFAULT_LISTEN: ListenSettings = {
   offsetMs: 0,
@@ -158,6 +170,7 @@ export function reviveState(raw: unknown): AppState {
   // instrument removed) must not reach the engine unrecognised.
   const audio = { ...base.audio, ...(r.audio ?? {}) };
   if (audio.tone !== "synth" && !isInstrument(audio.tone)) audio.tone = base.audio.tone;
+  if (audio.clickVolume === OLD_CLICK_DEFAULT) audio.clickVolume = base.audio.clickVolume;
 
   return {
     patterns,

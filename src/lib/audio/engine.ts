@@ -26,6 +26,9 @@ export type Tone = InstrumentId | "synth";
 
 const BUFFER_SECONDS = 2.6;
 
+/** How long a scheduled click stays on the books for the scorer to consult. */
+const CLICK_LOG_SECONDS = 6;
+
 export interface PluckOptions {
   at?: number;
   gain?: number;
@@ -48,10 +51,16 @@ export class AudioEngine {
   /** Both guitar paths meet here, so ducking is a single node. */
   private guitarGain: GainNode | null = null;
   private clickBus: GainNode | null = null;
+  /** The synthesised drum groove. Inside guitarGain on purpose — see build(). */
+  private backingBus: GainNode | null = null;
+  private noise: AudioBuffer | null = null;
   private sampler: GuitarSampler | null = null;
   private buffers = new Map<string, AudioBuffer>();
   private live = new Set<AudioBufferSourceNode>();
+  private liveBacking = new Set<AudioScheduledSourceNode>();
   private voices = new Map<number, { src: AudioBufferSourceNode; gain: GainNode }>();
+  /** Audio times of recently scheduled clicks. See clickTimes. */
+  private clicks: number[] = [];
   private _tone: Tone = "acoustic";
 
   private _volume = 0.75;
@@ -145,6 +154,13 @@ export class AudioEngine {
     this.clickBus = ctx.createGain();
     this.clickBus.gain.value = this._clickVolume;
     this.clickBus.connect(this.master);
+
+    // Unlike the click, the drums duck WITH the guitar: a drum hit is exactly
+    // the broadband transient the onset detector reads as a strum, so when the
+    // mic is judging on speakers the backing must go quiet too.
+    this.backingBus = ctx.createGain();
+    this.backingBus.gain.value = 0.5;
+    this.backingBus.connect(this.guitarGain);
 
     this.sampler = new GuitarSampler(ctx, this.sampleBus);
   }
@@ -353,11 +369,114 @@ export class AudioEngine {
     });
   }
 
+  /** Half a second of white noise, rendered once — the snare and hat body. */
+  private noiseBuffer(): AudioBuffer {
+    if (this.noise) return this.noise;
+    const ctx = this.ctx!;
+    const len = Math.ceil(ctx.sampleRate * 0.5);
+    const buf = ctx.createBuffer(1, len, ctx.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.noise = buf;
+    return buf;
+  }
+
+  /**
+   * One synthesised drum hit for the pattern backing: a pitch-dropping sine
+   * kick, band-passed noise over a short tone for the snare, high-passed
+   * noise for the hat. Per-note envelopes, so setValueAtTime + ramps are fine
+   * here — the control-bus rule (glide only) is about buses, not one-shots.
+   */
+  drum(at: number, kind: "kick" | "snare" | "hat") {
+    if (!this.ctx || !this.backingBus) return;
+    const ctx = this.ctx;
+    const t = Math.max(at, ctx.currentTime);
+    const bus = this.backingBus;
+
+    const keep = (src: AudioScheduledSourceNode, cleanup: () => void) => {
+      this.liveBacking.add(src);
+      src.onended = () => {
+        this.liveBacking.delete(src);
+        cleanup();
+      };
+    };
+
+    if (kind === "kick") {
+      const osc = ctx.createOscillator();
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(140, t);
+      osc.frequency.exponentialRampToValueAtTime(48, t + 0.09);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.85, t + 0.004);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      osc.connect(gain).connect(bus);
+      osc.start(t);
+      osc.stop(t + 0.2);
+      keep(osc, () => { osc.disconnect(); gain.disconnect(); });
+      return;
+    }
+
+    const src = ctx.createBufferSource();
+    src.buffer = this.noiseBuffer();
+    const filter = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, t);
+
+    if (kind === "snare") {
+      filter.type = "bandpass";
+      filter.frequency.value = 1800;
+      filter.Q.value = 0.8;
+      gain.gain.linearRampToValueAtTime(0.5, t + 0.002);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.11);
+      // The drum's note under the rattle.
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.setValueAtTime(190, t);
+      const og = ctx.createGain();
+      og.gain.setValueAtTime(0, t);
+      og.gain.linearRampToValueAtTime(0.35, t + 0.002);
+      og.gain.exponentialRampToValueAtTime(0.0001, t + 0.08);
+      osc.connect(og).connect(bus);
+      osc.start(t);
+      osc.stop(t + 0.1);
+      keep(osc, () => { osc.disconnect(); og.disconnect(); });
+    } else {
+      filter.type = "highpass";
+      filter.frequency.value = 6500;
+      gain.gain.linearRampToValueAtTime(0.18, t + 0.001);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
+    }
+
+    src.connect(filter).connect(gain).connect(bus);
+    src.start(t);
+    src.stop(t + 0.15);
+    keep(src, () => { src.disconnect(); filter.disconnect(); gain.disconnect(); });
+  }
+
+  /**
+   * When every recent click was scheduled, newest last.
+   *
+   * The scorer uses this to know exactly when its own metronome was audible:
+   * spectral tests alone were leaving the click close enough to a strum to
+   * occasionally score as one, and the app has no reason to guess about a
+   * sound it played itself.
+   */
+  get clickTimes(): readonly number[] {
+    return this.clicks;
+  }
+
   /** Metronome click. Accented beats are higher and louder. */
   click(at: number, accent = false) {
     if (!this.ctx || !this.clickBus) return;
     const ctx = this.ctx;
     const t = Math.max(at, ctx.currentTime);
+
+    // Logged whether or not anyone is listening — the cost is one number,
+    // and the scorer must never miss a click that did sound.
+    this.clicks.push(t);
+    const cutoff = ctx.currentTime - CLICK_LOG_SECONDS;
+    while (this.clicks.length && this.clicks[0] < cutoff) this.clicks.shift();
 
     const osc = ctx.createOscillator();
     osc.type = "square";
@@ -394,6 +513,15 @@ export class AudioEngine {
       }
     }
     this.live.clear();
+    // Drums booked inside the lookahead window must not survive a stop.
+    for (const src of this.liveBacking) {
+      try {
+        src.stop();
+      } catch {
+        // Already stopped; nothing to do.
+      }
+    }
+    this.liveBacking.clear();
   }
 }
 

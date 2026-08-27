@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { chordById } from "@/lib/music/chords";
 import {
   barOfSlot, MAX_BPM, MIN_BPM, normalise, type Pattern,
@@ -19,6 +19,7 @@ import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
 import { TransportBar } from "./TransportBar";
 import { ChromeText } from "./ui/ChromeText";
+import { GearIcon } from "./ui/GearIcon";
 import { MotifField } from "./ui/MotifField";
 import { Nav } from "./ui/Nav";
 
@@ -34,6 +35,9 @@ import { Nav } from "./ui/Nav";
  * render and the first client render agree — see lib/storage/store.ts.
  */
 
+/** Rotated per tight hit so the celebration doesn't go stale. */
+const TIGHT_EMOJI = ["🎯", "🔥", "✨", "💚", "🤘"];
+
 export function StrumLab() {
   const state = useSyncExternalStore(appStore.subscribe, appStore.getSnapshot, appStore.getServerSnapshot);
   const pattern = activePattern(state);
@@ -46,6 +50,9 @@ export function StrumLab() {
    */
   const [blocked, setBlocked] = useState<string | null>(null);
   const [zeroed, setZeroed] = useState<number | null>(null);
+  /** The headphones advice, shown once per visit when listening starts. */
+  const [headphoneTip, setHeadphoneTip] = useState(false);
+  const headphoneTipSeen = useRef(false);
 
   const setState = useCallback((updater: (prev: AppState) => AppState) => {
     appStore.set(updater);
@@ -90,7 +97,13 @@ export function StrumLab() {
     [setState],
   );
 
-  const engine = useStrumEngine(pattern, state.audio, state.listen);
+  // The drum backing belongs to progressions; drilling one chord doesn't need
+  // a groove fighting the click. Memoised so the engine's refs stay stable.
+  const audioForMode = useMemo(
+    () => ({ ...state.audio, backing: state.audio.backing && state.mode === "pattern" }),
+    [state.audio, state.mode],
+  );
+  const engine = useStrumEngine(pattern, audioForMode, state.listen);
   const account = useAccount(state);
 
   /**
@@ -166,16 +179,27 @@ export function StrumLab() {
   }, []);
 
   const handleMic = () => {
-    if (engine.micStatus === "off" || engine.micStatus === "error") void engine.startListening();
-    else engine.stopListening();
+    if (engine.micStatus === "off" || engine.micStatus === "error") {
+      // Once per visit, at the moment it becomes true: on headphones the mic
+      // hears only the guitar, so none of the app's defences against hearing
+      // itself have to work at all. Shown while listening starts, not
+      // instead of it.
+      if (!headphoneTipSeen.current) {
+        headphoneTipSeen.current = true;
+        setHeadphoneTip(true);
+      }
+      void engine.startListening();
+    } else {
+      engine.stopListening();
+    }
   };
 
   const notices = [
     engine.micMessage ? { tone: "loose", text: engine.micMessage } : null,
     engine.sampleState === "loading" ? { tone: "close", text: "Loading the guitar recordings — about 2 MB, once." } : null,
     engine.micStatus === "calibrating" ? { tone: "muted", text: "Measuring the room — stay quiet for a moment." } : null,
-    engine.room && engine.room.quality === "noisy" && engine.micStatus === "listening"
-      ? { tone: "close", text: engine.room.message } : null,
+    engine.room && (engine.room.quality === "noisy" || engine.room.quality === "silent") && engine.micStatus === "listening"
+      ? { tone: engine.room.quality === "silent" ? "loose" : "close", text: engine.room.message } : null,
     zeroed !== null ? { tone: "muted", text: `Latency offset set to ${zeroed} ms from your last few strums.` } : null,
   ].filter(Boolean) as { tone: string; text: string }[];
 
@@ -339,11 +363,25 @@ export function StrumLab() {
       {/* The pattern. Light ground so it reads as a separate object. */}
       <section className="block-light px-4 py-5 sm:px-8 sm:py-6">
         <div className="wrap">
-        <div className="mb-3 flex items-baseline justify-between gap-4">
+        <div className="mb-3 flex items-center justify-between gap-4">
           <span className="caps text-fg-dim">{pattern.name}</span>
-          <span className="caps text-fg-dim">
-            {pattern.bars} bar{pattern.bars > 1 ? "s" : ""} · {pattern.slotsPerBar === 8 ? "eighths" : `${pattern.slotsPerBar}ths`}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="caps text-fg-dim">
+              {pattern.bars} bar{pattern.bars > 1 ? "s" : ""} · {pattern.slotsPerBar === 8 ? "eighths" : `${pattern.slotsPerBar}ths`}
+            </span>
+            {/* The way to a different pattern, right where the pattern is —
+                the transport's gear is the same sheet, but nobody looks for
+                "change the strumming" at the far end of the bar. */}
+            <button
+              type="button"
+              onClick={() => setSettingsOpen(true)}
+              className="btn btn-icon !h-7 !w-7"
+              aria-label="Change the strumming pattern"
+              title="Change the strumming pattern"
+            >
+              <GearIcon size={13} />
+            </button>
+          </div>
         </div>
         <StrumLane
           pattern={pattern}
@@ -400,6 +438,18 @@ export function StrumLab() {
         </div>
       ) : null}
 
+      {/* The whole screen agrees for a beat on a tight hit — unless the
+          chord check says the shape was wrong, in which case celebrating
+          the timing would be lying about the strum. Keyed by the verdict
+          counter so consecutive tights each flash; never takes pointers. */}
+      {showVerdicts && engine.lastVerdict?.grade === "tight" && engine.lastVerdict.chordOk !== false ? (
+        <div key={engine.verdictSeq} className="hit-wash" aria-hidden="true">
+          <span className="hit-wash-emoji">
+            {TIGHT_EMOJI[engine.verdictSeq % TIGHT_EMOJI.length]}
+          </span>
+        </div>
+      ) : null}
+
       <div className="shrink-0 border-t border-line bg-ink/95 px-4 py-3 sm:px-8">
         <div className="wrap">
         <TransportBar
@@ -412,6 +462,8 @@ export function StrumLab() {
           onClick={(v) => setState((s) => ({ ...s, audio: { ...s.audio, click: v } }))}
           guitar={state.audio.guitar}
           onGuitar={(v) => setState((s) => ({ ...s, audio: { ...s.audio, guitar: v } }))}
+          backing={state.mode === "pattern" ? state.audio.backing : undefined}
+          onBacking={(v) => setState((s) => ({ ...s, audio: { ...s.audio, backing: v } }))}
           micStatus={engine.micStatus}
           onMic={handleMic}
           onSettings={() => setSettingsOpen(true)}
@@ -421,6 +473,8 @@ export function StrumLab() {
       </div>
       </>
       )}
+
+      {headphoneTip ? <HeadphoneTip onClose={() => setHeadphoneTip(false)} /> : null}
 
       {chordSheetBar !== null ? (
         <ChordSheet
@@ -471,6 +525,63 @@ export function StrumLab() {
         }}
       />
     </main>
+  );
+}
+
+/**
+ * The headphones advice, as a dialog over a dimmed screen.
+ *
+ * It earns the interruption: on speakers the microphone hears the app's own
+ * click and guitar as well as the player, and every defence against that is
+ * an inference that can be wrong. On headphones the question does not arise.
+ * Shown once per visit, when listening starts — never mid-take.
+ */
+function HeadphoneTip({ onClose }: { onClose: () => void }) {
+  const okRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    okRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      // Space is the transport key everywhere else on this screen; while the
+      // dialog is up it must dismiss rather than start the metronome behind it.
+      if (e.key === "Escape" || e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center">
+      <button
+        type="button"
+        aria-label="Dismiss"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+      />
+      <section
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="headphone-tip-title"
+        className="block-light card-flat relative w-full max-w-sm p-5 text-center sm:p-6"
+      >
+        <span aria-hidden="true" className="block text-4xl">🎧</span>
+        <h2 id="headphone-tip-title" className="caps-lg mt-3 text-fg">
+          Headphones give the best results
+        </h2>
+        <p className="mt-2 text-sm leading-relaxed text-fg-muted">
+          On speakers the microphone hears the metronome and the app&apos;s guitar as well as
+          you, and has to work out which was which. Through headphones it hears only your
+          playing — so the timing and chord scoring are at their most accurate.
+        </p>
+        <button ref={okRef} type="button" className="btn btn-lit mt-5 w-full sm:w-auto sm:px-8" onClick={onClose}>
+          OK
+        </button>
+      </section>
+    </div>
   );
 }
 

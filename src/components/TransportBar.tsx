@@ -2,12 +2,13 @@
 
 import { MAX_BPM, MIN_BPM } from "@/lib/music/pattern";
 import type { MicStatus } from "@/hooks/useStrumEngine";
+import { GearIcon } from "./ui/GearIcon";
 
 /** Play, tempo, what you hear, and the way into settings. */
 
 export function TransportBar({
   playing, onToggle, bpm, onBpm, onNudgeBpm,
-  click, onClick, guitar, onGuitar,
+  click, onClick, guitar, onGuitar, backing, onBacking,
   micStatus, onMic, onSettings, level,
 }: {
   playing: boolean;
@@ -21,6 +22,9 @@ export function TransportBar({
   onClick: (v: boolean) => void;
   guitar: boolean;
   onGuitar: (v: boolean) => void;
+  /** The drum backing. Undefined = not offered in this mode. */
+  backing?: boolean;
+  onBacking?: (v: boolean) => void;
   micStatus: MicStatus;
   onMic: () => void;
   onSettings: () => void;
@@ -68,10 +72,13 @@ export function TransportBar({
         </button>
       </div>
 
+      {/* Full-width row of its own on a phone (the bar already wraps there);
+          inline and flexible from md up, where the thumb also grows — see the
+          range styles in globals.css. */}
       <input
         type="range"
         aria-label="Tempo"
-        className="hidden min-w-24 flex-1 md:block"
+        className="order-last w-full basis-full md:order-none md:w-auto md:min-w-24 md:basis-auto md:flex-1"
         min={MIN_BPM}
         max={MAX_BPM}
         value={bpm}
@@ -81,6 +88,9 @@ export function TransportBar({
       <div className="flex items-center gap-2">
         <PillToggle on={click} onChange={onClick} label="Click" />
         <PillToggle on={guitar} onChange={onGuitar} label="Guitar" />
+        {backing !== undefined && onBacking ? (
+          <PillToggle on={backing} onChange={onBacking} label="Drums" />
+        ) : null}
       </div>
 
       <button
@@ -102,20 +112,10 @@ export function TransportBar({
 
       {micOn ? <LevelMeter db={level} /> : null}
 
-      {/* A gear glyph renders as an illegible speck at this size and does not
-          match the editorial type elsewhere. The word is clearer and shorter
-          to parse than an icon nobody has to decode. */}
       {/* An icon, not the word: on a phone the transport is the tightest row in
-          the app and "Settings" cost a whole line of it. Drawn rather than an
-          emoji, which renders as an illegible speck at this size. */}
+          the app and "Settings" cost a whole line of it. */}
       <button type="button" onClick={onSettings} className="btn btn-icon sm:ml-auto" aria-label="Settings">
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="3.2" stroke="currentColor" strokeWidth="1.9" />
-          <path
-            d="M12 2.6v2.2M12 19.2v2.2M21.4 12h-2.2M4.8 12H2.6M18.6 5.4l-1.6 1.6M7 17l-1.6 1.6M18.6 18.6L17 17M7 7L5.4 5.4"
-            stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"
-          />
-        </svg>
+        <GearIcon />
       </button>
     </div>
   );

@@ -21,8 +21,46 @@ import type { Onset } from "./detector";
 
 export type Grade = "tight" | "close" | "loose" | "missed" | "extra";
 
-export const TIGHT_MS = 30;
-export const CLOSE_MS = 70;
+/**
+ * Widened 30/70 → 45/100 (2026-08-27). ±30 ms is session-drummer territory
+ * and read as "way stricter" than it should for the beginners this app is
+ * for; ±45 ms is still audibly together, and "close" now reaches 100 ms
+ * before a strum is called properly out.
+ */
+export const TIGHT_MS = 45;
+export const CLOSE_MS = 100;
+
+/**
+ * How long an expectation stays open past its match window. Onsets reach the
+ * scorer ~180 ms after the attack — the detector holds each one until every
+ * string of the strum is sounding before describing it (FINGERPRINT_LAG) —
+ * so closing a slot at the window's edge would call the hit "missed" and the
+ * late-arriving onset "extra". The only cost is missed-verdicts appearing a
+ * beat later.
+ */
+const MATCH_GRACE_S = 0.22;
+
+/**
+ * How near a click an onset must land to be judged against it, and how much
+ * body it must then have to be believed.
+ *
+ * The metronome plays through the speakers while the mic judges, lands
+ * exactly on the beat, and therefore scores as PERFECT timing whenever it
+ * gets through — the worst possible failure, because it rewards not playing.
+ * The detector's spectral gate rejects most clicks, but the margin measured
+ * against a synthetic click was thin (its low-band share reached 0.07
+ * against a 0.08 gate), and a real speaker in a real room is not obliged to
+ * stay on the safe side of that.
+ *
+ * So the app stops guessing about a sound it played itself: every click is
+ * logged with its exact audio time, and an onset landing on one has to clear
+ * a much higher bar for body than the general gate asks. A genuine strum on
+ * the beat sails through — a strum's low-band share is several times this —
+ * while the click cannot, no matter how it is coloured on the way back in.
+ * The window is generous because the latency offset is only ever approximate.
+ */
+const CLICK_WINDOW_S = 0.05;
+const CLICK_BODY_RISE = 1.12;
 
 /** How close to the app's own note an onset must be to be suspected bleed. */
 const BLEED_WINDOW_S = 0.022;
@@ -87,6 +125,12 @@ export class Scorer {
   /** Set by the caller: is the app's own guitar actually audible right now? */
   public guitarAudible = false;
   public duckMode: "mute" | "subtract" | "off" = "mute";
+  /**
+   * Audio times of clicks the app has played, newest last. Injected as a
+   * plain array rather than an engine reference so this module stays free of
+   * Web Audio and testable with synthetic input.
+   */
+  public clickTimes: readonly number[] = [];
 
   constructor(
     private pattern: Pattern,
@@ -165,6 +209,18 @@ export class Scorer {
     });
   }
 
+  /**
+   * Is this onset the app's own metronome coming back through the mic?
+   * See CLICK_WINDOW_S — a click we scheduled, and no guitar body in it.
+   */
+  private looksLikeClick(onset: Onset, t: number): boolean {
+    if (onset.bodyRise >= CLICK_BODY_RISE) return false;
+    for (const c of this.clickTimes) {
+      if (Math.abs(t - c) <= CLICK_WINDOW_S) return true;
+    }
+    return false;
+  }
+
   /** Called for every detected attack. */
   hear(onset: Onset) {
     const t = onset.time - this.offsetMs / 1000;
@@ -172,6 +228,7 @@ export class Scorer {
     // Dropped silently: it is neither a hit nor an extra, because we do not
     // believe the player made it. The slot stays open and can still be missed.
     if (this.looksLikeBleed(onset, t)) return;
+    if (this.looksLikeClick(onset, t)) return;
 
     let best: Expectation | null = null;
     let bestErr = Infinity;
@@ -200,8 +257,11 @@ export class Scorer {
 
     // A muted chuck has no pitch worth matching, and direction on a chuck is
     // not meaningful either — so those checks are skipped rather than failed.
+    // The gate sits where the synthetic sweeps put it: at 0.55 no clean-strum
+    // misidentification got through while ~80% of correct guesses did
+    // (scripts/chord-match-eval.ts). Below it, silence beats accusation.
     const chordOk =
-      best.wantStroke === "mute" || onset.chordConfidence < 0.45
+      best.wantStroke === "mute" || onset.chordConfidence < 0.55
         ? null
         : onset.chordGuess === best.wantChord;
     const strokeOk =
@@ -233,7 +293,7 @@ export class Scorer {
    * loop with the current audio time.
    */
   sweep(now: number) {
-    const cutoff = now - this.tolerance;
+    const cutoff = now - this.tolerance - MATCH_GRACE_S;
     const remaining: Expectation[] = [];
     for (const e of this.expectations) {
       if (e.time >= cutoff) {

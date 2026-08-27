@@ -77,7 +77,7 @@ and `components/` may import React. Data files are the extension points:
 | To change | Open | Notes |
 | --- | --- | --- |
 | Mic setup | `lib/listen/mic.ts` | Worklet source inline; browser "enhancements" forced off |
-| Strum onset + chord guess | `lib/listen/detector.ts` | Thresholds are named constants at the top, each with its measured rationale |
+| Strum onset + chord guess | `lib/listen/detector.ts` | Thresholds are named constants at the top, each with its measured rationale. Chord identity is fingerprinted ~174 ms AFTER the attack (FINGERPRINT_LAG) via per-note Goertzel energies (`noteEnergies` in dsp.ts) matched in note space — the FFT chroma cannot resolve the low strings and scored 4% on strums. Same-strum string arrivals are merged (STRUM_MERGE_S), and the scorer holds slots open through MATCH_GRACE_S to absorb the deferred arrival. Onsets are peak-picked from LOG-compressed flux (linear flux is deaf to a chord re-struck over its own ring) and gated on high-band flux share (beat wobbles have no attack transient). Re-run BOTH `npx tsx scripts/chord-match-eval.ts` (94%/92%/87% tidy/detuned/lazy isolated, 0% wrong past the gate; 83% mid-progression) and `npx tsx scripts/timing-eval.ts` (verdict-by-verdict timing: ±4 ms stamps, exact onset counts, fast-16ths, up-strums + stroke direction, chucks, calibrated noisy room, latency offset, tempo extremes, soft fingerstyle) after touching any of it — as of 2026-08-27. The HF attack gate's split/ratio balance is a three-way trade between wobble extras, noisy rooms and SOFT FINGER strums (a 3000 Hz split made fingerstyle undetectable, 0/12) — re-check all three scenarios when moving it. A LOW-band gate (LOW_SPLIT_HZ) rejects the app's own metronome, which is highpassed at 600 Hz, plays through the speakers exactly on the beat, and scored as perfect phantom strumming before the gate (6/8 clicks). Backing that up, the engine LOGS every click's audio time (`engine.clickTimes` → `Scorer.clickTimes`) and the scorer drops onsets landing on one that lack `bodyRise` (low-band energy after the attack over just before it — the one measure a coincident click cannot fake; flux ratios fail because the click's treble dilutes them). BOTH click scenarios must stay perfect: metronome-only 0 phantom hits AND metronome+playing 12/12 real strums |
 | Timing verdicts | `lib/listen/scoring.ts` | `TIGHT_MS`/`CLOSE_MS`, latency offset, bleed rejection |
 | Pitch (tuner, note game) | `lib/listen/pitch.ts` | NSDF, time-domain; the FFT's 43 Hz bins cannot do this job |
 | Note-game rules | `lib/listen/noteGame.ts` | Pure matcher: 60-cent tolerance, 4 steady frames, 700ms cooldown |
@@ -165,7 +165,13 @@ Break these and things fail in ways that are hard to trace back.
 - Audio changes: open `/soundcheck`, press run, expect a full PASS board
   (loudness parity, no clipping, mute paths, click gaps ≈300ms).
 - Detector/DSP changes: these modules are pure — test with synthetic input
-  (node runs `.ts` directly) before trusting any in-browser impression.
+  (`npx tsx <script>`) before trusting any in-browser impression. Two
+  standing harnesses: `scripts/chord-match-eval.ts` renders every chord as a
+  staggered strum and prints matcher accuracy plus the confidence separation
+  the scorer's gate relies on; `scripts/timing-eval.ts` runs whole sessions —
+  known injected timing errors through detector AND scorer, verdict by
+  verdict, plus on-time sixteenths and ring-over chord changes. Run both.
+  (`DEBUG_ONSETS=1` prints every onset candidate with its HF-flux share.)
 - The dev server is `strumlab` in `.claude/launch.json` (port 3210, autoPort).
 - **Embedded browser-pane quirks** (Claude Code preview): `ResizeObserver` and
   `window.resize` never fire and `innerWidth` can read 0 — never build layout

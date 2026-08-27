@@ -15,7 +15,9 @@ import { getEngine } from "@/lib/audio/engine";
 import { performSlot } from "@/lib/audio/perform";
 import { Transport } from "@/lib/audio/transport";
 import { beatSlots, slotSeconds, type Pattern } from "@/lib/music/pattern";
-import { OnsetDetector, type Onset, type RoomProfile } from "@/lib/listen/detector";
+import {
+  MIN_STRUM_SPREAD_S, OnsetDetector, STRUM_MERGE_S, type Onset, type RoomProfile,
+} from "@/lib/listen/detector";
 import { MicError, openMic, type MicCapture } from "@/lib/listen/mic";
 import {
   emptyStats, estimateOffsetMs, Scorer,
@@ -40,6 +42,15 @@ export interface HeardNote {
 }
 
 const CALIBRATION_MS = 2200;
+
+/**
+ * The detector's same-strum merge window for this pattern: never wider than
+ * half the slot spacing, so on-time sixteenths at a fast tempo aren't
+ * swallowed as one strum's staggered strings.
+ */
+function strumSpread(p: Pattern): number {
+  return Math.min(STRUM_MERGE_S, Math.max(MIN_STRUM_SPREAD_S, slotSeconds(p, p.bpm) * 0.5));
+}
 
 /** How often the screen re-reads the audio clock. See the ui loop below. */
 const UI_TICK_MS = 25;
@@ -106,7 +117,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       const p = patternRef.current;
       const a = audioRef.current;
 
-      performSlot(engine, p, slot, time, { guitar: a.guitar, click: a.click });
+      performSlot(engine, p, slot, time, { guitar: a.guitar, click: a.click, backing: a.backing });
       scorerRef.current?.expect(slot, cycle, time);
       uiQueue.current.push({ slot, time });
     },
@@ -132,6 +143,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       slotSeconds: () => slotSeconds(patternRef.current, patternRef.current.bpm),
     });
     scorerRef.current?.update(pattern, pattern.bpm);
+    if (detectorRef.current) detectorRef.current.maxStrumSpreadS = strumSpread(pattern);
   }, [pattern]);
 
   useEffect(() => {
@@ -305,6 +317,10 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
   const handleOnset = useCallback((o: Onset) => {
     const l = listenRef.current;
+    // Refreshed at the moment of judging rather than on a timer: the scorer
+    // must see every click that has sounded, including one scheduled inside
+    // the transport's lookahead a fraction of a second ago.
+    if (scorerRef.current) scorerRef.current.clickTimes = engine.clickTimes;
     setHeard({
       chord: l.checkChord ? o.chordGuess : null,
       confidence: o.chordConfidence,
@@ -312,7 +328,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       at: o.time,
     });
     scorerRef.current?.hear(o);
-  }, []);
+  }, [engine]);
 
   const stopListening = useCallback(() => {
     engine.setGuitarDuck(false);
@@ -336,6 +352,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       void fetchSamples();
       const ctx = engine.context!;
       const detector = new OnsetDetector(ctx.sampleRate, handleOnset);
+      detector.maxStrumSpreadS = strumSpread(patternRef.current);
       detectorRef.current = detector;
 
       const capture = await openMic(ctx, ({ time, samples }) => {

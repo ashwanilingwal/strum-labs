@@ -462,6 +462,52 @@ body {
   .hit-flash { animation: none; opacity: 0; }
 }
 
+/* --- tight-hit wash --------------------------------------------------------
+   The whole screen agrees with you for a beat: a soft green bloom with an
+   emoji, fired for every "tight" verdict while the mic is judging. Keyed per
+   verdict in React so back-to-back tights each flash; `forwards` leaves it
+   invisible when done, and it never intercepts a pointer. */
+
+.hit-wash {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(95, 227, 160, 0.30),
+    rgba(95, 227, 160, 0.10) 55%,
+    transparent 82%
+  );
+  animation: wash-pop 620ms ease-out forwards;
+}
+
+.hit-wash-emoji {
+  font-size: clamp(3rem, 10vw, 5.5rem);
+  filter: drop-shadow(0 6px 24px rgba(95, 227, 160, 0.5));
+  animation: wash-emoji 620ms cubic-bezier(0.2, 1.4, 0.4, 1) forwards;
+}
+
+@keyframes wash-pop {
+  0% { opacity: 0; }
+  12% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes wash-emoji {
+  0% { transform: scale(0.4); opacity: 0; }
+  18% { transform: scale(1.08); opacity: 1; }
+  70% { opacity: 1; }
+  100% { transform: scale(1.12) translateY(-12px); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hit-wash, .hit-wash-emoji { animation: none; opacity: 0; }
+}
+
 /* --- confetti motifs ------------------------------------------------------ */
 
 /* Absolute, not fixed: blocks paint an opaque ground, so a page-level layer
@@ -537,6 +583,13 @@ input[type="range"]::-webkit-slider-thumb {
 
 input[type="range"]::-moz-range-track { height: 4px; border-radius: 999px; background: var(--line); }
 input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: none; border-radius: 50%; background: var(--accent); }
+
+/* A desktop pointer is precise but the slider is long there — a bigger thumb
+   reads as the control it is instead of a speck on a hairline. */
+@media (min-width: 768px) {
+  input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; margin-top: -8px; }
+  input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .motif, .verdict-orb-flash, .verdict-badge, .verdict-flag { animation: none; }
