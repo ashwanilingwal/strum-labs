@@ -10,7 +10,7 @@
 import type { Tone } from "../audio/engine";
 import { isInstrument } from "../audio/samples";
 import { buildChordDrill, buildPattern, PROGRESSIONS, STRUM_STYLES, strumStyleById } from "../music/library";
-import { normalise, PRESETS, type Pattern } from "../music/pattern";
+import { MAX_BPM, MIN_BPM, normalise, PRESETS, type Pattern } from "../music/pattern";
 import { createLocalStore, type ExternalStore } from "./store";
 
 export const STORAGE_KEY = "strumlab:v1";
@@ -68,6 +68,12 @@ export interface AppState {
   };
   audio: AudioSettings;
   listen: ListenSettings;
+  /**
+   * Tempo of exercise mode's optional pace click. Only the tempo persists —
+   * on/off is per-visit and always starts off, so no session opens with a
+   * metronome already ticking over an untimed game.
+   */
+  exerciseBpm: number;
   /** Set once the room has been measured, so we don't re-ask every session. */
   roomNoiseDb: number | null;
 }
@@ -116,6 +122,7 @@ export function initialState(): AppState {
     pick,
     audio: { ...DEFAULT_AUDIO },
     listen: { ...DEFAULT_LISTEN },
+    exerciseBpm: 60,
     roomNoiseDb: null,
   };
 }
@@ -159,6 +166,9 @@ export function reviveState(raw: unknown): AppState {
     pick,
     audio,
     listen: { ...base.listen, ...(r.listen ?? {}) },
+    exerciseBpm: typeof r.exerciseBpm === "number"
+      ? Math.max(MIN_BPM, Math.min(MAX_BPM, Math.round(r.exerciseBpm)))
+      : base.exerciseBpm,
     roomNoiseDb: typeof r.roomNoiseDb === "number" ? r.roomNoiseDb : null,
   };
 }

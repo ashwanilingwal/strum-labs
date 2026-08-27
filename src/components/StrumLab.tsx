@@ -205,7 +205,15 @@ export function StrumLab() {
         </div>
       </div>
       {state.mode === "exercise" ? (
-        <ExerciseMode />
+        <ExerciseMode
+          bpm={state.exerciseBpm}
+          onNudgeBpm={(delta) =>
+            setState((prev) => ({
+              ...prev,
+              exerciseBpm: Math.max(MIN_BPM, Math.min(MAX_BPM, prev.exerciseBpm + delta)),
+            }))
+          }
+        />
       ) : (
       <>
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">

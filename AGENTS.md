@@ -87,7 +87,7 @@ and `components/` may import React. Data files are the extension points:
 | To change | Open |
 | --- | --- |
 | Play screen shell + mode switch | `components/StrumLab.tsx` |
-| Exercises mode (level rail + games) | `components/ExerciseMode.tsx`, `components/NoteGameBody.tsx`, `hooks/useNoteGame.ts` |
+| Exercises mode (curriculum rail/sheet + games, optional pace click) | `components/ExerciseMode.tsx`, `components/NoteGameBody.tsx`, `hooks/useNoteGame.ts`, `hooks/useExerciseClick.ts` |
 | Lane / live feedback / summary | `components/StrumLane.tsx`, `LiveFeedback.tsx`, `SessionSummary.tsx` |
 | Transport bar | `components/TransportBar.tsx` |
 | Settings sheet | `components/SettingsPanel.tsx` (+ `PracticePicker`, `PatternEditor`, `ChordPicker`) |

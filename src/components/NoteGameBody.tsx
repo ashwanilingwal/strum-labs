@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { targetMidi, useNoteGame } from "@/hooks/useNoteGame";
 import { previewNotes, stopPreview } from "@/lib/audio/preview";
 import { type Exercise, type NoteTarget } from "@/lib/music/exercises";
@@ -28,7 +28,14 @@ function noteAsChord(t: NoteTarget): Chord {
 
 const DEMO_STEP_MS = 550;
 
-export function NoteGameBody({ exercise }: { exercise: Exercise }) {
+export function NoteGameBody({
+  exercise, extraControls,
+}: {
+  exercise: Exercise;
+  /** Host-owned controls for the button row — the exercise click lives here,
+   *  outside this component, so it survives the keyed remount per exercise. */
+  extraControls?: ReactNode;
+}) {
   const targets = exercise.notes ?? [];
   const game = useNoteGame(targets);
   const playing = game.status === "listening";
@@ -99,6 +106,9 @@ export function NoteGameBody({ exercise }: { exercise: Exercise }) {
           <button type="button" className="btn btn-lit mt-5" onClick={() => void game.start()}>
             Again
           </button>
+          {/* Still here on the done screen, so a running click can be stopped
+              without restarting the game. */}
+          {extraControls ? <div className="mt-4 flex justify-center">{extraControls}</div> : null}
         </div>
       ) : (
         <>
@@ -168,7 +178,7 @@ export function NoteGameBody({ exercise }: { exercise: Exercise }) {
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-wrap items-center gap-2">
             <button
               type="button"
               className={`btn ${playing ? "btn-hot" : "btn-lit"}`}
@@ -192,6 +202,7 @@ export function NoteGameBody({ exercise }: { exercise: Exercise }) {
             >
               {demoing ? "Stop" : "Hear it"}
             </button>
+            {extraControls}
           </div>
           {game.message ? <p className="mt-3 text-xs text-loose">{game.message}</p> : null}
         </>
