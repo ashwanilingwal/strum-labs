@@ -51,7 +51,7 @@ const FINGERPRINT_SKIP = 8;
  * Samples kept for the chord chroma: the fingerprint window, plus enough
  * audio BEFORE the attack to measure what was already ringing there.
  */
-const CHORD_RING = 16384;
+const CHORD_RING = 24576;
 /** Hops of pre-attack audio measured for the ring-over subtraction. */
 const PRE_RING_HOPS = 20;
 /**
@@ -99,6 +99,9 @@ const HF_SPLIT_HZ = 2400;
 const BODY_SKIP = 6;
 /** Frames of body measured after that — out to ~120 ms past the attack. */
 const BODY_FRAMES = 14;
+/** Where the "late" sustain window starts: ~116 ms past the attack, when
+ *  every drum in the backing kit has finished and strings have not. */
+const SUSTAIN_FROM = 20;
 /** Walking back from the flux peak: frames still above this fraction of the
  *  peak belong to the rise, and the earliest of them is the attack. In the
  *  log-flux domain the ring's own flux sits closer under an attack peak than
@@ -107,6 +110,10 @@ const BODY_FRAMES = 14;
 const ONSET_START_FRACTION = 0.5;
 /** Frames of flux history the adaptive threshold looks at (~0.5 s). */
 const HISTORY = 86;
+/** How long after a calibration probe click its return is looked for. */
+const PROBE_WINDOW_S = 0.25;
+/** A probe's flux peak must stand this far above the room to count. */
+const PROBE_MIN_RISE = 4;
 /** A guitarist cannot physically strum twice inside this. */
 export const MIN_GAP_S = 0.055;
 /**
@@ -128,6 +135,44 @@ export const STRUM_MERGE_S = 0.11;
  * strums (scripts/timing-eval.ts).
  */
 export const MIN_STRUM_SPREAD_S = 0.07;
+/**
+ * The longest a single strum may take from first string to last. A strum is
+ * not always a snap: a beginner's rake can spread six strings over 200–300 ms,
+ * and each late string is its own flux peak. The merge therefore CHAINS —
+ * each absorbed string extends the window from itself, by the tempo-aware
+ * gap — up to this total, and never past what the pattern leaves room for
+ * (see RAKE_GUARD_S). Measured before chaining: a 200 ms rake scored one
+ * extra per strum, a 300 ms rake two (scripts/timing-eval.ts, slow-rake
+ * scenarios).
+ */
+export const RAKE_MAX_S = 0.35;
+/**
+ * How much of the pattern's shortest strum gap a rake may never eat: twice
+ * the scorer's CLOSE band (scoring.ts), because two adjacent slots played
+ * one late and the next early — each still a "close" hit the scorer must
+ * grade — land that much nearer each other than the pattern says. A bound
+ * at 60% of the gap merged exactly that pair at 90 bpm eighths (+60 / −85 ms,
+ * 188 ms apart) into one strum.
+ */
+const RAKE_GUARD_S = 0.2;
+/**
+ * The chord window stays open past a rake's last absorbed string for one
+ * merge gap plus the detection lag: a straggler at hop h is only SEEN at
+ * h + LAG, and a window that closed first turned the string at +157 ms of a
+ * 200 ms rake into a fresh strum — one phantom extra per strum.
+ */
+const RAKE_TAIL_LAG_HOPS = LAG;
+/**
+ * How far past a rake's last absorbed string the fingerprinted audio runs.
+ * Shorter than the merge window itself: the window stays open to catch
+ * stragglers, but a lone strum's chord read is tuned to FINGERPRINT_LAG
+ * hops — averaging 75 ms more decay over-subtracted the previous chord's
+ * ring-over (scripts/timing-eval.ts, 600 ms changes: 10/12 fell to 8/12).
+ */
+const RAKE_TAIL_HOPS = 12;
+/** Hard cap on the chord window, in hops — must fit CHORD_RING with the
+ *  pre-attack slice: 60 + PRE_RING_HOPS + skip < 96. */
+const WINDOW_MAX_HOPS = 60;
 /**
  * Stroke direction: a down-strum STARTS on the bass strings, an up-strum on
  * the treble — so the cue is the bass share of the FLUX (the newly-arriving
@@ -159,6 +204,15 @@ const STROKE_BASS_THRESHOLD = 0.12;
  * never at risk.
  */
 const LOW_SPLIT_HZ = 700;
+/**
+ * Floor of the band the drum test reads. The backing kick is a sine that
+ * sweeps 140→48 Hz, so everything it adds sits under this; the hat lives above
+ * 6.5 kHz; the snare is noise band-passed around 1.8 kHz plus a 190 Hz tone.
+ * A strum's fundamentals and first harmonics (E2's 82 Hz aside) fill
+ * 200–700 Hz, so a rise in that band after an attack is a guitar and not the
+ * app's own drums.
+ */
+const MID_SPLIT_HZ = 200;
 const LOW_ATTACK_RATIO = 0.08;
 
 export interface RoomProfile {
@@ -169,6 +223,13 @@ export interface RoomProfile {
   /** "silent" means the mic is delivering nothing at all — see endCalibration. */
   quality: "silent" | "quiet" | "usable" | "noisy";
   message: string;
+  /**
+   * The round trip, measured: how long after the app scheduled a click the
+   * mic heard it — speaker out, across the room, mic in, driver, worklet. Null
+   * when the clicks never came back (headphones, or a click too quiet to
+   * register), in which case the device's own latency estimate stands.
+   */
+  loopbackMs: number | null;
 }
 
 export interface Onset {
@@ -207,6 +268,20 @@ export interface Onset {
    * the total, overlapping the clicks' own 0.01-0.08 (scripts/timing-eval.ts).
    */
   bodyRise: number;
+  /**
+   * How much of the attack's mid-band (200–700 Hz) energy is still there late
+   * in the window (~116–174 ms) compared with early (~35–80 ms).
+   *
+   * The measure a coincident drum hit cannot fake. Every voice in the backing
+   * kit is gone within ~100 ms — the kick's envelope, the snare's noise, the
+   * hat — so a drum reads well under 1 here, while struck strings ring for
+   * seconds and read ≈1 whether or not a drum landed with them. A ratio
+   * against the level BEFORE the attack (like bodyRise) fails for drums:
+   * over a quiet gap the "before" is the noise floor and any residue at all
+   * blows the ratio up (measured: a lone kick 0.86, a real strum 1.03 —
+   * inseparable). Sustain is scale-free and needs no baseline.
+   */
+  sustain: number;
   /** Pitch class of the lowest note heard, or null if it could not be tracked. */
   bassPitchClass: number | null;
   /** "down" | "up" and how confident, from how the brightness evolves. */
@@ -230,6 +305,9 @@ interface Frame {
    * click, highpassed at 600 Hz, never touches it at all.
    */
   lowEnergy: number;
+  /** Total magnitude between MID_SPLIT_HZ and LOW_SPLIT_HZ — the strings'
+   *  fundamentals and first harmonics, above where a kick drum lives. */
+  midEnergy: number;
   centroid: number;
   chroma: Float32Array;
 }
@@ -412,7 +490,37 @@ export class OnsetDetector {
   private pendingOnset: {
     abs: number; onsetAbs: number; time: number; frame: Frame; threshold: number;
     lowRatio: number;
+    /** The last string absorbed into this strum — where the chain extends from. */
+    lastAbs: number; lastTime: number;
   } | null = null;
+
+  /** The longest one strum may take, first string to last, at this pattern. */
+  private rakeMaxS(): number {
+    return Math.min(RAKE_MAX_S, Math.max(STRUM_MERGE_S, this.minStrumGapS - RAKE_GUARD_S));
+  }
+
+  /**
+   * How far the next string of a rake may trail the last one absorbed. Twice
+   * the strum spread, so one string the flux detector misses (its peak lost
+   * under the ringing of the strings before it) doesn't break the chain —
+   * the 5th string of a 300 ms rake escaped as an extra on 3 strums in 8 that
+   * way. Widened only where the rake bound leaves room for a strum PLUS a
+   * skipped string; at eighths and faster it stays one spread, or a real
+   * strum 127 ms after the previous strum's last string was chained into it.
+   */
+  private chainGapS(): number {
+    const spread = this.maxStrumSpreadS;
+    return Math.min(2 * spread, Math.max(spread, this.rakeMaxS() - spread));
+  }
+
+  /** Where the pending strum's chord window should end, in absolute hops. */
+  private windowEnd(p: NonNullable<typeof this.pendingOnset>): number {
+    const tail = Math.ceil((this.chainGapS() * this.sampleRate) / HOP) + RAKE_TAIL_LAG_HOPS;
+    return Math.min(
+      p.abs + WINDOW_MAX_HOPS,
+      Math.max(p.abs + FINGERPRINT_LAG, p.lastAbs + tail),
+    );
+  }
 
   /**
    * How far apart two attacks must be to count as two strums rather than one
@@ -422,12 +530,18 @@ export class OnsetDetector {
    * sixteenths at 140 bpm (scripts/timing-eval.ts).
    */
   public maxStrumSpreadS = STRUM_MERGE_S;
+  /**
+   * Shortest gap between two real strums in the current pattern, seconds.
+   * The engine sets it; it bounds how long a rake may be merged (RAKE_MAX_S).
+   */
+  public minStrumGapS = 0.375;
 
   private loBin: number;
   private hiBin: number;
   private hfBin: number;
   private bassBin: number;
   private lowBin: number;
+  private midBin: number;
   private room: RoomProfile | null = null;
   private calibrating = false;
   private calibrationFrames: Frame[] = [];
@@ -441,6 +555,7 @@ export class OnsetDetector {
     this.hfBin = Math.max(1, Math.floor((HF_SPLIT_HZ * FFT_SIZE) / sampleRate));
     this.bassBin = Math.max(this.loBin + 1, Math.ceil((BASS_SPLIT_HZ * FFT_SIZE) / sampleRate));
     this.lowBin = Math.max(this.loBin + 1, Math.ceil((LOW_SPLIT_HZ * FFT_SIZE) / sampleRate));
+    this.midBin = Math.max(this.loBin + 1, Math.ceil((MID_SPLIT_HZ * FFT_SIZE) / sampleRate));
   }
 
   get roomProfile(): RoomProfile | null {
@@ -465,12 +580,42 @@ export class OnsetDetector {
    * a fan or an open window is worth turning off, and being told so beats
    * silently unreliable scoring.
    */
-  endCalibration(): RoomProfile {
+  /**
+   * `probeTimes` are the audio times of clicks the app played on purpose
+   * during the measurement, so the room statistics can step around them and
+   * the round-trip latency can be read off them — see RoomProfile.loopbackMs.
+   */
+  endCalibration(probeTimes: readonly number[] = []): RoomProfile {
     this.calibrating = false;
-    const frames = this.calibrationFrames;
+    const all = this.calibrationFrames;
+    const nearProbe = (t: number) => probeTimes.some((p) => t >= p - 0.02 && t <= p + PROBE_WINDOW_S);
+    const frames = all.filter((f) => !nearProbe(f.time));
     const noiseDb = frames.length ? dbfs(median(frames.map((f) => f.rms))) : -90;
     const fluxFloor = frames.length ? median(frames.map((f) => f.flux)) : 0;
     const peakDb = frames.length ? dbfs(Math.max(...frames.map((f) => f.rms))) : -90;
+
+    // The loopback: for each probe, the frame in its window where the flux
+    // rise begins (the same walk-back the onset detector uses), provided the
+    // window's peak clearly stands above the room. Median across probes.
+    const lags: number[] = [];
+    for (const p of probeTimes) {
+      const win = all.filter((f) => f.time >= p && f.time <= p + PROBE_WINDOW_S);
+      if (win.length < 3) continue;
+      let peak = win[0];
+      for (const f of win) if (f.flux > peak.flux) peak = f;
+      if (peak.flux < Math.max(fluxFloor * PROBE_MIN_RISE, 1e-4)) continue;
+      let onset = peak;
+      for (let k = win.indexOf(peak) - 1; k >= 0; k--) {
+        if (win[k].flux >= peak.flux * ONSET_START_FRACTION) onset = win[k];
+        else break;
+      }
+      lags.push(onset.time - p);
+    }
+    // Frame times are quantised to the hop, and the walk-back lands on the
+    // first frame of the rise, so the read runs half a hop early on average:
+    // measured 14/33/61 ms for true 18/37/64 (scripts/timing-eval.ts).
+    const halfHop = HOP / this.sampleRate / 2;
+    const loopbackMs = lags.length >= 2 ? Math.round((median(lags) + halfHop) * 1000) : null;
 
     let quality: RoomProfile["quality"];
     let message: string;
@@ -497,8 +642,13 @@ export class OnsetDetector {
     if (peakDb > -12) {
       message += " Something loud spiked during calibration, so try that again if the scoring looks wrong.";
     }
+    if (probeTimes.length) {
+      message += loopbackMs !== null
+        ? ` Latency measured at ${loopbackMs} ms and taken into account.`
+        : " The clicks didn't reach the mic (headphones?), so the device's latency estimate is in use.";
+    }
 
-    this.room = { noiseDb, fluxFloor, quality, message };
+    this.room = { noiseDb, fluxFloor, quality, message, loopbackMs };
     this.calibrationFrames = [];
     return this.room;
   }
@@ -587,6 +737,7 @@ export class OnsetDetector {
       bassFlux,
       lowFlux,
       lowEnergy: bandEnergy(this.mag, this.loBin, this.lowBin),
+      midEnergy: bandEnergy(this.mag, this.midBin, this.lowBin),
       centroid: spectralCentroid(this.mag, this.sampleRate, FFT_SIZE, this.loBin, this.hiBin),
       chroma: chroma(this.mag, this.sampleRate, FFT_SIZE, new Float32Array(12)),
     };
@@ -611,7 +762,7 @@ export class OnsetDetector {
     this.detect();
 
     // A pending attack whose window has filled is finally described.
-    if (this.pendingOnset && this.frameCount - this.pendingOnset.abs >= FINGERPRINT_LAG) {
+    if (this.pendingOnset && this.frameCount >= this.windowEnd(this.pendingOnset)) {
       this.finishPending(null);
     }
   }
@@ -630,7 +781,10 @@ export class OnsetDetector {
     if (!p) return;
     this.pendingOnset = null;
     const base = this.frameCount - this.frames.length;
-    const endAbs = Math.min(p.abs + FINGERPRINT_LAG, capAbs ?? Infinity);
+    const endAbs = Math.min(
+      this.windowEnd(p), capAbs ?? Infinity,
+      Math.max(p.abs + FINGERPRINT_LAG, p.lastAbs + RAKE_TAIL_HOPS),
+    );
     // The frame window starts at the backtracked attack, not the flux peak:
     // the stroke-direction slope reads the first ~30 ms, and anchored at the
     // peak it was reading the middle of the strum instead of its start.
@@ -747,10 +901,17 @@ export class OnsetDetector {
     const lowRatio = lowExcess / (lf || 1);
     if (lowRatio < LOW_ATTACK_RATIO) return;
 
-    // The same strum's later strings: keep the window open, emit nothing.
-    if (this.pendingOnset && time - this.pendingOnset.time < this.maxStrumSpreadS) {
-      this.lastOnsetTime = time;
-      return;
+    // The same strum's later strings: keep the window open, emit nothing. The
+    // gap is measured from the LAST string absorbed, so a slow rake chains
+    // through; the whole rake is bounded by RAKE_MAX_S and by the pattern.
+    if (this.pendingOnset) {
+      const p = this.pendingOnset;
+      if (time - p.lastTime < this.chainGapS() && time - p.time < this.rakeMaxS()) {
+        p.lastTime = time;
+        p.lastAbs = this.absIndexOf(idx);
+        this.lastOnsetTime = time;
+        return;
+      }
     }
 
     this.lastOnsetTime = time;
@@ -760,7 +921,7 @@ export class OnsetDetector {
     this.finishPending(abs);
     this.pendingOnset = {
       abs, onsetAbs: this.absIndexOf(onsetIdx), time, frame: f, threshold,
-      lowRatio,
+      lowRatio, lastAbs: abs, lastTime: time,
     };
   }
 
@@ -778,10 +939,19 @@ export class OnsetDetector {
     // strum actually rises from, which crushed the ratio for on-beat strums.
     const pre = this.frames.slice(Math.max(0, startRel - 4), Math.max(0, startRel - 1));
     const post = window.slice(BODY_SKIP, BODY_SKIP + BODY_FRAMES);
-    const bodyRise =
+    const rise = (pick: (fr: Frame) => number) =>
       pre.length >= 3 && post.length >= 3
-        ? median(post.map((fr) => fr.lowEnergy)) / Math.max(median(pre.map((fr) => fr.lowEnergy)), 1e-9)
+        ? median(post.map(pick)) / Math.max(median(pre.map(pick)), 1e-9)
         // Not enough history to compare against (session start): believe it.
+        : Infinity;
+    const bodyRise = rise((fr) => fr.lowEnergy);
+    // Sustain: late mid-band energy over early. See Onset.sustain. A window
+    // cut short by a following attack has no "late" — believe the attack.
+    const earlyMid = window.slice(BODY_SKIP, BODY_SKIP + 8).map((fr) => fr.midEnergy);
+    const lateMid = window.slice(SUSTAIN_FROM, SUSTAIN_FROM + 10).map((fr) => fr.midEnergy);
+    const sustain =
+      earlyMid.length >= 4 && lateMid.length >= 4
+        ? median(lateMid) / Math.max(median(earlyMid), 1e-9)
         : Infinity;
 
     // The chord, heard note-by-note over the deferred window, minus whatever
@@ -855,6 +1025,7 @@ export class OnsetDetector {
       matchMargin: margin,
       lowRatio,
       bodyRise,
+      sustain,
       bassPitchClass: heardBass,
       stroke,
       strokeConfidence,

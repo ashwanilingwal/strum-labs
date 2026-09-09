@@ -24,7 +24,7 @@ change the architecture, change this file in the same commit.
 | Route | What it is | Component |
 | --- | --- | --- |
 | `/` | Cover — wordmark, one sentence, one button, legal link | `app/page.tsx` |
-| `/play` | The practice screen. Three modes: Chords, Patterns, Exercises | `components/StrumLab.tsx` |
+| `/play` | The play screen. Four modes: Levels (the game, default), Chords, Patterns, Exercises | `components/StrumLab.tsx` |
 | `/learn` | Chord library + saved patterns as tabs (`?tab=`) | `components/learn/Learn.tsx` |
 | `/songs` | Follow-along song player, fingerpick or strum, live pace | `components/SongPlayer.tsx` |
 | `/tuner` | Tuner (its own time-domain DSP) | `components/Tuner.tsx` |
@@ -58,6 +58,7 @@ and `components/` may import React. Data files are the extension points:
 | a strum style / progression | `lib/music/library.ts` | practice picker (styles × progressions compose) |
 | a pattern preset | `lib/music/pattern.ts` → `PRESET_SOURCE` | patterns tab |
 | a song | `lib/music/songs.ts` → `SONGS` | song player (chords are facts; no lyrics, no note-for-note transcriptions — see /legal) |
+| a game level | `lib/music/levels.ts` → `GAME_LEVELS` | the Levels map. One chord set + one bar of strokes + bpm + loops; keep the ladder ordered by hand difficulty. Pass rules (`PASS_TIMING` 60% on the beat, `PASS_CHORDS` 30% right chord) and stars live beside it |
 | an exercise | `lib/music/exercises.ts` → `EXERCISES` | play screen's Exercises mode. ONE kind only: a listening game (`notes` targets, untimed). `level` is a difficulty TIER (Starter→Advanced), `family` the topic tag (spider, octaves, finger ladder…). Add to its tier; keep the array tier-sorted — Prev/Next walks it in order |
 | a tuning | `lib/music/tuning.ts` → `TUNINGS` | tuner |
 | a sampled instrument | `scripts/build-samples.py <id> <dir>` + one entry in `lib/audio/samples/index.ts` | tone selects. Licence files must travel with the audio |
@@ -68,7 +69,7 @@ and `components/` may import React. Data files are the extension points:
 | To change | Open | Notes |
 | --- | --- | --- |
 | What a slot sounds like | `lib/audio/perform.ts` | One function; fingerpicking/drums land here |
-| When things happen | `lib/audio/transport.ts` | Lookahead scheduler; supports `fromSlot` for mid-song starts |
+| When things happen | `lib/audio/transport.ts` | Lookahead scheduler (0.3 s — a 200 ms main-thread stall booked a slot 63 ms late at 0.12); supports `fromSlot` for mid-song starts. `npx tsx scripts/transport-eval.ts` drives it against a real clock with deliberate stalls and a tempo change: booked times must never drift and no slot may be booked after its time |
 | Synth / audio graph / duck | `lib/audio/engine.ts` | Karplus-Strong; `glide()` for all bus levels; limiter is the last node; `output` tap for diagnostics |
 | Sampled playback / voice stealing | `lib/audio/sampler.ts` | `trim` per instrument in `samples/index.ts`; keep abs peak < 0.9 at the bus |
 | One-shot previews | `lib/audio/preview.ts` | Books everything up front; `previewChord`, `previewPattern`, `previewNotes` (the exercise "Hear it" demo), `stopPreview()` |
@@ -76,8 +77,9 @@ and `components/` may import React. Data files are the extension points:
 ### Listening
 | To change | Open | Notes |
 | --- | --- | --- |
-| Mic setup | `lib/listen/mic.ts` | Worklet source inline; browser "enhancements" forced off |
-| Strum onset + chord guess | `lib/listen/detector.ts` | Thresholds are named constants at the top, each with its measured rationale. Chord identity is fingerprinted ~174 ms AFTER the attack (FINGERPRINT_LAG) via per-note Goertzel energies (`noteEnergies` in dsp.ts) matched in note space — the FFT chroma cannot resolve the low strings and scored 4% on strums. Same-strum string arrivals are merged (STRUM_MERGE_S), and the scorer holds slots open through MATCH_GRACE_S to absorb the deferred arrival. Onsets are peak-picked from LOG-compressed flux (linear flux is deaf to a chord re-struck over its own ring) and gated on high-band flux share (beat wobbles have no attack transient). Re-run BOTH `npx tsx scripts/chord-match-eval.ts` (94%/92%/87% tidy/detuned/lazy isolated, 0% wrong past the gate; 83% mid-progression) and `npx tsx scripts/timing-eval.ts` (verdict-by-verdict timing: ±4 ms stamps, exact onset counts, fast-16ths, up-strums + stroke direction, chucks, calibrated noisy room, latency offset, tempo extremes, soft fingerstyle) after touching any of it — as of 2026-08-27. The HF attack gate's split/ratio balance is a three-way trade between wobble extras, noisy rooms and SOFT FINGER strums (a 3000 Hz split made fingerstyle undetectable, 0/12) — re-check all three scenarios when moving it. A LOW-band gate (LOW_SPLIT_HZ) rejects the app's own metronome, which is highpassed at 600 Hz, plays through the speakers exactly on the beat, and scored as perfect phantom strumming before the gate (6/8 clicks). Backing that up, the engine LOGS every click's audio time (`engine.clickTimes` → `Scorer.clickTimes`) and the scorer drops onsets landing on one that lack `bodyRise` (low-band energy after the attack over just before it — the one measure a coincident click cannot fake; flux ratios fail because the click's treble dilutes them). BOTH click scenarios must stay perfect: metronome-only 0 phantom hits AND metronome+playing 12/12 real strums |
+| Mic setup | `lib/listen/mic.ts` | Worklet source inline; browser "enhancements" forced off. `attachTap` reuses the worklet to read any node sample-accurately (the soundcheck's metronome test) |
+| Latency the scorer subtracts | `hooks/useStrumEngine.ts` `runProbes` + `detector.endCalibration(probes)` | While the room is measured, three clicks go out and their return through the mic is timed (`RoomProfile.loopbackMs`); manual `listen.offsetMs` > measured loopback > `estimateOffsetMs`. Null on headphones (nothing comes back) — by design, never invented. Verified ±1 ms in timing-eval's loopback scenario |
+| Strum onset + chord guess | `lib/listen/detector.ts` | Thresholds are named constants at the top, each with its measured rationale. Chord identity is fingerprinted ~174 ms AFTER the attack (FINGERPRINT_LAG) via per-note Goertzel energies (`noteEnergies` in dsp.ts) matched in note space — the FFT chroma cannot resolve the low strings and scored 4% on strums. Same-strum string arrivals are merged (STRUM_MERGE_S), and the merge CHAINS through slow rakes — each absorbed string extends the window from itself (`chainGapS`), bounded by `rakeMaxS` = the pattern's shortest strum gap minus RAKE_GUARD_S (twice the scorer's CLOSE band, so one late strum followed by one early strum still count as two) and by RAKE_MAX_S; the engine feeds the gap via `detector.minStrumGapS`. The chord window's lifetime must outlast the detection lag (RAKE_TAIL_LAG_HOPS), but the audio fingerprinted ends RAKE_TAIL_HOPS past the last string — a longer lone-strum read over-subtracted ring-over. The scorer holds slots open through MATCH_GRACE_S to absorb the deferred arrival. Onsets are peak-picked from LOG-compressed flux (linear flux is deaf to a chord re-struck over its own ring) and gated on high-band flux share (beat wobbles have no attack transient). Re-run BOTH `npx tsx scripts/chord-match-eval.ts` (94%/92%/87% tidy/detuned/lazy isolated, 0% wrong past the gate; 83% mid-progression) and `npx tsx scripts/timing-eval.ts` (verdict-by-verdict timing: ±4 ms stamps, exact onset counts, fast-16ths, up-strums + stroke direction, chucks, calibrated noisy room, latency offset, tempo extremes, soft fingerstyle, click/drum bleed, loopback probe, slow rakes of 25/40/60 ms per string) after touching any of it — as of 2026-09-09. The HF attack gate's split/ratio balance is a three-way trade between wobble extras, noisy rooms and SOFT FINGER strums (a 3000 Hz split made fingerstyle undetectable, 0/12) — re-check all three scenarios when moving it. A LOW-band gate (LOW_SPLIT_HZ) rejects the app's own metronome, which is highpassed at 600 Hz, plays through the speakers exactly on the beat, and scored as perfect phantom strumming before the gate (6/8 clicks). Backing that up, the engine LOGS every click's audio time (`engine.clickTimes` → `Scorer.clickTimes`) and the scorer drops onsets landing on one that lack `bodyRise` (low-band energy after the attack over just before it — the one measure a coincident click cannot fake; flux ratios fail because the click's treble dilutes them). BOTH click scenarios must stay perfect: metronome-only 0 phantom hits AND metronome+playing 12/12 real strums |
 | Timing verdicts | `lib/listen/scoring.ts` | `TIGHT_MS`/`CLOSE_MS`, latency offset, bleed rejection |
 | Pitch (tuner, note game) | `lib/listen/pitch.ts` | NSDF, time-domain; the FFT's 43 Hz bins cannot do this job |
 | Note-game rules | `lib/listen/noteGame.ts` | Pure matcher: 60-cent tolerance, 4 steady frames, 700ms cooldown |
@@ -87,6 +89,7 @@ and `components/` may import React. Data files are the extension points:
 | To change | Open |
 | --- | --- |
 | Play screen shell + mode switch | `components/StrumLab.tsx` |
+| The game (level map, stage, result sheet) | `components/GameMode.tsx` — a level installs its pattern in the reserved `QUICK_ID` slot, turns the mic on before the count-in, ends itself on `engine.cycle` reaching `loops`, banks best-of results in `state.game`. Emoji feedback: `components/TimingBoxes.tsx` (early / on time / late boxes, streak, ✅/❌ chord badge) — shared with free play |
 | Exercises mode (curriculum rail/sheet + games, optional pace click) | `components/ExerciseMode.tsx`, `components/NoteGameBody.tsx`, `hooks/useNoteGame.ts`, `hooks/useExerciseClick.ts` |
 | Lane / live feedback / summary | `components/StrumLane.tsx`, `LiveFeedback.tsx`, `SessionSummary.tsx` |
 | Transport bar | `components/TransportBar.tsx` |
@@ -135,8 +138,13 @@ Break these and things fail in ways that are hard to trace back.
 7. **One voice per string** (sampler + synth voice stealing) — samples ring
    ~5s, and without stealing a bar of eighths stacks ~48 notes into mush.
 8. **Sampled tones fall back to the synth, never to silence.**
-9. **The click never gets ducked with the guitar** — it sits outside
-   `guitarGain` so mic-mode muting can't take the metronome down.
+9. **The click and the drums never get ducked with the guitar** — both sit
+   outside `guitarGain`, because they are the beat. The mic is defended from
+   them by knowledge, not silence: the engine logs every click and drum time
+   (`clickTimes`/`drumTimes` → the Scorer), and an onset landing on one must
+   prove it is a strum — `bodyRise` for the click, `sustain` AND `bodyRise`
+   for a drum (see scoring.ts). Both must stay at 0 phantoms / 12-of-12 in
+   `scripts/timing-eval.ts`'s four bleed scenarios.
 10. **Status never replaces content.** A prominent slot holds one kind of
     thing; when a signal drops, dim the last value and put liveness in a side
     pill. (The tuner and the count-in both violated this once.)
@@ -162,8 +170,14 @@ Break these and things fail in ways that are hard to trace back.
 ## Verifying changes
 
 - `npx tsc --noEmit && npx eslint . && npm run build` — all three, always.
+- The theme is the third skin (night sky, 2026-09-09): sky tokens still live
+  under the `--chrome-*` names, `ChromeText` is now cartoon lettering (cream
+  face, dark stroked outline behind), `MotifField` draws stars/clouds/moon,
+  `btn-lit` is the acid-green go button. Components still name no colours.
 - Audio changes: open `/soundcheck`, press run, expect a full PASS board
-  (loudness parity, no clipping, mute paths, click gaps ≈300ms).
+  (loudness parity, no clipping, mute paths, click gaps ≈300ms, and H: a
+  real Transport under deliberate main-thread stalls, its clicks read off
+  the master bus to the sample via `attachTap` — max |heard−booked| < 3 ms).
 - Detector/DSP changes: these modules are pure — test with synthetic input
   (`npx tsx <script>`) before trusting any in-browser impression. Two
   standing harnesses: `scripts/chord-match-eval.ts` renders every chord as a

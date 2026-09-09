@@ -61,6 +61,23 @@ const MATCH_GRACE_S = 0.22;
  */
 const CLICK_WINDOW_S = 0.05;
 const CLICK_BODY_RISE = 1.12;
+/**
+ * The drums get the same treatment as the click — logged by the engine,
+ * judged by what they cannot fake — and need two witnesses where the click
+ * needed one. A drum cannot still be sounding 150 ms later: snares and hats
+ * read 0.1–0.2 on Onset.sustain, a lone kick (whose mid band is noise over
+ * noise) wanders up to 0.59, and real strums sit at 0.79+. But a kick landing
+ * over a chord that is still ringing inherits the ring's sustain, so it must
+ * ALSO add body the way a fresh strum does (bodyRise, the click's own test —
+ * such a kick measured 0.82–0.91 against strums at 1.2+). Any onset on a
+ * logged hit that fails either is the drum. Measured on the synthetic kit:
+ * 0 phantoms with the player silent, 12/12 with the player strumming on the
+ * beats over the whole kit (scripts/timing-eval.ts). A mid-band rise was
+ * tried as a witness and dropped: over a quiet gap it is a ratio against the
+ * noise floor and reads 1.4–3.9 for a lone kick.
+ */
+const DRUM_WINDOW_S = 0.05;
+const DRUM_SUSTAIN = 0.7;
 
 /** How close to the app's own note an onset must be to be suspected bleed. */
 const BLEED_WINDOW_S = 0.022;
@@ -96,6 +113,10 @@ export interface SessionStats {
   missed: number;
   extra: number;
   tight: number;
+  /** Hits that landed ahead of the beat, past TIGHT_MS. */
+  early: number;
+  /** Hits that landed behind the beat, past TIGHT_MS. */
+  late: number;
   /** Mean signed error in ms across matched hits. A steady bias shows up here. */
   meanErrorMs: number;
   /** Spread of the errors. This is the number that actually improves. */
@@ -131,6 +152,8 @@ export class Scorer {
    * Web Audio and testable with synthetic input.
    */
   public clickTimes: readonly number[] = [];
+  /** Audio times of drum hits the app has played, newest last. */
+  public drumTimes: readonly number[] = [];
 
   constructor(
     private pattern: Pattern,
@@ -221,6 +244,15 @@ export class Scorer {
     return false;
   }
 
+  /** Is this onset the app's own drums? See DRUM_WINDOW_S. */
+  private looksLikeDrum(onset: Onset, t: number): boolean {
+    if (onset.sustain >= DRUM_SUSTAIN && onset.bodyRise >= CLICK_BODY_RISE) return false;
+    for (const d of this.drumTimes) {
+      if (Math.abs(t - d) <= DRUM_WINDOW_S) return true;
+    }
+    return false;
+  }
+
   /** Called for every detected attack. */
   hear(onset: Onset) {
     const t = onset.time - this.offsetMs / 1000;
@@ -229,6 +261,7 @@ export class Scorer {
     // believe the player made it. The slot stays open and can still be missed.
     if (this.looksLikeBleed(onset, t)) return;
     if (this.looksLikeClick(onset, t)) return;
+    if (this.looksLikeDrum(onset, t)) return;
 
     let best: Expectation | null = null;
     let bestErr = Infinity;
@@ -272,6 +305,8 @@ export class Scorer {
     this.errors.push(errorMs);
     this.stats.hits += 1;
     if (grade === "tight") this.stats.tight += 1;
+    else if (errorMs < 0) this.stats.early += 1;
+    else this.stats.late += 1;
     if (chordOk !== null) {
       this.stats.chordChecked += 1;
       if (chordOk) this.stats.chordRight += 1;
@@ -331,7 +366,7 @@ export class Scorer {
 
 export function emptyStats(): SessionStats {
   return {
-    hits: 0, missed: 0, extra: 0, tight: 0,
+    hits: 0, missed: 0, extra: 0, tight: 0, early: 0, late: 0,
     meanErrorMs: 0, spreadMs: 0, accuracy: 0,
     chordChecked: 0, chordRight: 0, strokeChecked: 0, strokeRight: 0,
   };

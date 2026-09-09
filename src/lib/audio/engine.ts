@@ -51,7 +51,7 @@ export class AudioEngine {
   /** Both guitar paths meet here, so ducking is a single node. */
   private guitarGain: GainNode | null = null;
   private clickBus: GainNode | null = null;
-  /** The synthesised drum groove. Inside guitarGain on purpose — see build(). */
+  /** The synthesised drum groove. Beside the click, outside the duck — see build(). */
   private backingBus: GainNode | null = null;
   private noise: AudioBuffer | null = null;
   private sampler: GuitarSampler | null = null;
@@ -61,6 +61,8 @@ export class AudioEngine {
   private voices = new Map<number, { src: AudioBufferSourceNode; gain: GainNode }>();
   /** Audio times of recently scheduled clicks. See clickTimes. */
   private clicks: number[] = [];
+  /** Audio times of recently scheduled drum hits. See drumTimes. */
+  private drums: number[] = [];
   private _tone: Tone = "acoustic";
 
   private _volume = 0.75;
@@ -137,6 +139,7 @@ export class AudioEngine {
     //                           guitarGain -> master -> destination
     //   sample -> sampleBus ----/
     //   click  -> clickBus ------------------> master
+    //   drums  -> backingBus ----------------> master
     //
     // The click deliberately sits outside guitarGain: ducking the guitar while
     // the mic listens must not take the metronome with it.
@@ -155,12 +158,13 @@ export class AudioEngine {
     this.clickBus.gain.value = this._clickVolume;
     this.clickBus.connect(this.master);
 
-    // Unlike the click, the drums duck WITH the guitar: a drum hit is exactly
-    // the broadband transient the onset detector reads as a strum, so when the
-    // mic is judging on speakers the backing must go quiet too.
+    // The drums sit beside the click, outside guitarGain: the groove is the
+    // point of a level, so it must survive the mic-mode duck. Every hit is
+    // logged (see drumTimes) so the scorer can recognise its own drums the
+    // way it recognises its own click, rather than muting them.
     this.backingBus = ctx.createGain();
     this.backingBus.gain.value = 0.5;
-    this.backingBus.connect(this.guitarGain);
+    this.backingBus.connect(this.master);
 
     this.sampler = new GuitarSampler(ctx, this.sampleBus);
   }
@@ -393,6 +397,10 @@ export class AudioEngine {
     const t = Math.max(at, ctx.currentTime);
     const bus = this.backingBus;
 
+    this.drums.push(t);
+    const cutoff = ctx.currentTime - CLICK_LOG_SECONDS;
+    while (this.drums.length && this.drums[0] < cutoff) this.drums.shift();
+
     const keep = (src: AudioScheduledSourceNode, cleanup: () => void) => {
       this.liveBacking.add(src);
       src.onended = () => {
@@ -466,6 +474,11 @@ export class AudioEngine {
     return this.clicks;
   }
 
+  /** When every recent drum hit was scheduled, newest last. Same idea. */
+  get drumTimes(): readonly number[] {
+    return this.drums;
+  }
+
   /** Metronome click. Accented beats are higher and louder. */
   click(at: number, accent = false) {
     if (!this.ctx || !this.clickBus) return;
@@ -494,7 +507,10 @@ export class AudioEngine {
     osc.connect(gain).connect(hp).connect(this.clickBus);
     osc.start(t);
     osc.stop(t + 0.05);
+    // Tracked so a Stop cancels clicks already booked inside the lookahead.
+    this.liveBacking.add(osc);
     osc.onended = () => {
+      this.liveBacking.delete(osc);
       osc.disconnect();
       gain.disconnect();
       hp.disconnect();

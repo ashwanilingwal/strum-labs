@@ -11,7 +11,15 @@
  * with the audio time they will sound; the caller decides what to do with them.
  */
 
-const LOOKAHEAD_S = 0.12;
+/**
+ * How far ahead slots are booked. Measured with scripts/transport-eval.ts:
+ * the booked TIMES never drift, but a slot booked after its own time still
+ * sounds late, and at 0.12 s a single 200 ms main-thread stall — one heavy
+ * React commit, one GC pause — booked a slot 63 ms late. 0.3 s rides out
+ * anything short of a frozen tab. The cost is that a sound booked inside the
+ * window outlives a Stop by up to 300 ms, which engine.silence() now cancels.
+ */
+const LOOKAHEAD_S = 0.3;
 const TICK_MS = 20;
 
 export interface SlotEvent {

@@ -15,6 +15,7 @@ import type { PracticeMode } from "@/lib/storage/settings";
  */
 
 const MODES: { id: PracticeMode; label: string; hint: string }[] = [
+  { id: "game", label: "Levels", hint: "Play the game" },
   { id: "chord", label: "Chords", hint: "Drill one shape" },
   { id: "pattern", label: "Patterns", hint: "Play a progression" },
   { id: "exercise", label: "Exercises", hint: "Technique games" },

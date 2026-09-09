@@ -62,6 +62,49 @@ export interface MicCapture {
   stop: () => void;
 }
 
+/** Contexts that already have the tap processor registered — registering twice throws. */
+const tapped = new WeakSet<AudioContext>();
+
+async function loadTap(ctx: AudioContext) {
+  if (tapped.has(ctx)) return;
+  const blobUrl = URL.createObjectURL(new Blob([TAP_PROCESSOR], { type: "application/javascript" }));
+  try {
+    await ctx.audioWorklet.addModule(blobUrl);
+  } finally {
+    URL.revokeObjectURL(blobUrl);
+  }
+  tapped.add(ctx);
+}
+
+/**
+ * Listen to any node the way the mic is listened to: raw blocks with
+ * sample-accurate audio-clock times. The soundcheck taps the master bus with
+ * this to measure when the metronome actually sounds, rather than when it
+ * was asked to. Returns a detach function.
+ */
+export async function attachTap(
+  ctx: AudioContext,
+  node: AudioNode,
+  onBlock: (b: MicBlock) => void,
+): Promise<() => void> {
+  await loadTap(ctx);
+  const tap = new AudioWorkletNode(ctx, "tap", { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
+  tap.port.onmessage = (e: MessageEvent<MicBlock>) => onBlock(e.data);
+  const silent = ctx.createGain();
+  silent.gain.value = 0;
+  node.connect(tap).connect(silent).connect(ctx.destination);
+  return () => {
+    tap.port.onmessage = null;
+    try {
+      node.disconnect(tap);
+      tap.disconnect();
+      silent.disconnect();
+    } catch {
+      // Already torn down.
+    }
+  };
+}
+
 export async function openMic(ctx: AudioContext, onBlock: (b: MicBlock) => void): Promise<MicCapture> {
   if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
     throw new MicError(
@@ -91,12 +134,7 @@ export async function openMic(ctx: AudioContext, onBlock: (b: MicBlock) => void)
     throw new MicError("unknown", "The microphone couldn't be opened.");
   }
 
-  const blobUrl = URL.createObjectURL(new Blob([TAP_PROCESSOR], { type: "application/javascript" }));
-  try {
-    await ctx.audioWorklet.addModule(blobUrl);
-  } finally {
-    URL.revokeObjectURL(blobUrl);
-  }
+  await loadTap(ctx);
 
   const source = ctx.createMediaStreamSource(stream);
 

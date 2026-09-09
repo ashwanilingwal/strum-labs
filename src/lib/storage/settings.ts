@@ -10,6 +10,7 @@
 import type { Tone } from "../audio/engine";
 import { isInstrument } from "../audio/samples";
 import { buildChordDrill, buildPattern, PROGRESSIONS, STRUM_STYLES, strumStyleById } from "../music/library";
+import { GAME_LEVELS, type LevelResult } from "../music/levels";
 import { MAX_BPM, MIN_BPM, normalise, PRESETS, type Pattern } from "../music/pattern";
 import { createLocalStore, type ExternalStore } from "./store";
 
@@ -46,8 +47,8 @@ export interface ListenSettings {
   duckMode: DuckMode;
 }
 
-/** One chord, a progression, or the technique games. */
-export type PracticeMode = "chord" | "pattern" | "exercise";
+/** The level game, one chord, a progression, or the technique games. */
+export type PracticeMode = "game" | "chord" | "pattern" | "exercise";
 
 /**
  * Quick picks are written into one reserved pattern rather than appended.
@@ -76,6 +77,11 @@ export interface AppState {
    * metronome already ticking over an untimed game.
    */
   exerciseBpm: number;
+  /** The level game: which level is up, and how every attempt so far ended. */
+  game: {
+    level: number;
+    results: Record<number, LevelResult>;
+  };
   /** Set once the room has been measured, so we don't re-ask every session. */
   roomNoiseDb: number | null;
 }
@@ -83,7 +89,8 @@ export interface AppState {
 export const DEFAULT_AUDIO: AudioSettings = {
   guitar: true,
   click: true,
-  backing: false,
+  // On by default: the drums ARE the level. Off is one tap away.
+  backing: true,
   volume: 0.75,
   // 0.5 buried the click under the guitar for most players (raised 2026-08-27).
   clickVolume: 0.7,
@@ -117,7 +124,7 @@ export const DEFAULT_PICK = {
 /** Rebuild the reserved quick-pick pattern from the current selection. */
 export function quickPattern(mode: PracticeMode, pick: AppState["pick"]): Pattern {
   const style = strumStyleById(pick.styleId) ?? STRUM_STYLES[0];
-  if (mode === "chord") {
+  if (mode === "chord" || mode === "game") {
     return { ...buildChordDrill(style, pick.chordId), id: QUICK_ID };
   }
   const prog = PROGRESSIONS.find((p) => p.id === pick.progressionId) ?? PROGRESSIONS[0];
@@ -130,11 +137,12 @@ export function initialState(): AppState {
   return {
     patterns,
     activeId: QUICK_ID,
-    mode: "chord",
+    mode: "game",
     pick,
     audio: { ...DEFAULT_AUDIO },
     listen: { ...DEFAULT_LISTEN },
     exerciseBpm: 60,
+    game: { level: 1, results: {} },
     roomNoiseDb: null,
   };
 }
@@ -155,7 +163,10 @@ export function reviveState(raw: unknown): AppState {
 
   const pick = { ...base.pick, ...(r.pick ?? {}) };
   const mode: PracticeMode =
-    r.mode === "pattern" ? "pattern" : r.mode === "exercise" ? "exercise" : "chord";
+    r.mode === "pattern" ? "pattern"
+      : r.mode === "exercise" ? "exercise"
+      : r.mode === "chord" ? "chord"
+      : "game";
 
   // The reserved slot must always exist — stored state from before it did, or
   // one where it was deleted, would otherwise leave the selectors pointing at
@@ -171,6 +182,27 @@ export function reviveState(raw: unknown): AppState {
   const audio = { ...base.audio, ...(r.audio ?? {}) };
   if (audio.tone !== "synth" && !isInstrument(audio.tone)) audio.tone = base.audio.tone;
   if (audio.clickVolume === OLD_CLICK_DEFAULT) audio.clickVolume = base.audio.clickVolume;
+  // State saved before the game existed predates drums-on-by-default; the
+  // groove is now the point of a level, so it comes on once for everyone.
+  if (!r.game) audio.backing = true;
+
+  const rawGame = (r.game ?? {}) as Partial<AppState["game"]>;
+  const results: Record<number, LevelResult> = {};
+  for (const [k, v] of Object.entries(rawGame.results ?? {})) {
+    const n = Number(k);
+    if (!GAME_LEVELS.some((l) => l.n === n) || !v || typeof v !== "object") continue;
+    const stars = Math.max(0, Math.min(3, Math.round(Number(v.stars) || 0))) as LevelResult["stars"];
+    results[n] = {
+      passed: Boolean(v.passed),
+      timing: Math.max(0, Math.min(1, Number(v.timing) || 0)),
+      chords: Math.max(0, Math.min(1, Number(v.chords) || 0)),
+      stars,
+    };
+  }
+  const game = {
+    level: GAME_LEVELS.some((l) => l.n === rawGame.level) ? (rawGame.level as number) : 1,
+    results,
+  };
 
   return {
     patterns,
@@ -182,6 +214,7 @@ export function reviveState(raw: unknown): AppState {
     exerciseBpm: typeof r.exerciseBpm === "number"
       ? Math.max(MIN_BPM, Math.min(MAX_BPM, Math.round(r.exerciseBpm)))
       : base.exerciseBpm,
+    game,
     roomNoiseDb: typeof r.roomNoiseDb === "number" ? r.roomNoiseDb : null,
   };
 }

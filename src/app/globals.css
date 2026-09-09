@@ -1,50 +1,54 @@
 @import "tailwindcss";
 
 /* ==========================================================================
-   StrumLab — flat editorial. Black and steel blocks, liquid-chrome type,
-   sparkle and orb confetti, tiny wide-tracked caps.
+   StrumLab — a night sky. Deep blue ground, drifting clouds, a moon, stars;
+   fat cartoon lettering with a dark outline; acid-green highlights. The
+   register of a mobile game's level select, not a lab.
 
    The whole look lives here. Components reference semantic token names only
    (--fg, --accent, --tight) and never literal colours, so re-skinning the app
-   is an edit to this file and nothing else.
+   is an edit to this file and nothing else — this is its third skin.
    ========================================================================== */
 
 :root {
-  --ink: #07080a;
-  --ink-soft: #101319;
-  --ink-lift: #191d25;
+  --ink: #071b33;
+  --ink-soft: #0b2747;
+  --ink-lift: #12335d;
 
-  /* Liquid chrome and gunmetal. Y2K's other register — the one of brushed
-     steel, ice-blue displays and acid highlights rather than pastels. */
-  --chrome-50:  #f5f8fb;
-  --chrome-100: #e4eaf1;
-  --chrome-200: #ccd6e1;
-  --chrome-300: #a9b8c8;
-  --chrome-400: #7c8c9e;
-  --chrome-500: #526172;
-  --chrome-700: #28323e;
+  /* The sky's own scale, cream at the top through cloud-blue to deep water.
+     Kept under the old "chrome" names so every component keeps working. */
+  --chrome-50:  #fbf7e8;
+  --chrome-100: #e9f1fb;
+  --chrome-200: #cfe0f3;
+  --chrome-300: #a6c3e2;
+  --chrome-400: #6d92bf;
+  --chrome-500: #3d6597;
+  --chrome-700: #173759;
 
-  --ice: #5fd2f2;
-  --ice-deep: #1f6d8c;
-  --acid: #b8f24a;
+  --ice: #7fd8ff;
+  --ice-deep: #2b7cc0;
+  /* The green of the title card. */
+  --acid: #8ee43a;
+  /* The moon. */
+  --moon: #ffe17a;
 
-  /* Verdict semantics. Pastel so they belong to the palette, but far enough
-     apart in hue to stay readable as good / nearly / wrong. */
-  --tight: #5fe3a0;
-  --close: #ffc94d;
-  --loose: #ff6b7a;
+  /* Verdict semantics. Bright enough to read as game feedback against a
+     dark sky, far enough apart in hue to stay good / nearly / wrong. */
+  --tight: #6fe38f;
+  --close: #ffd45a;
+  --loose: #ff6b6b;
   --extra: var(--ice);
 
   --accent: var(--ice);
   --accent-deep: var(--ice-deep);
 
   /* Contextual: overridden wholesale by .block-light. */
-  --fg: #eef3f8;
-  --fg-muted: #a3b1c0;
-  --fg-dim: #6c7b8b;
+  --fg: #f3f8ff;
+  --fg-muted: #b6c9e0;
+  --fg-dim: #7f9bbd;
   --surface: var(--ink-soft);
   --surface-lift: var(--ink-lift);
-  --line: rgba(204, 214, 225, 0.18);
+  --line: rgba(166, 195, 226, 0.22);
 
   --radius: 18px;
   --radius-sm: 10px;
@@ -81,7 +85,7 @@
 html { color-scheme: dark; }
 
 body {
-  background: var(--ink);
+  background: linear-gradient(180deg, #0c2d54 0%, #082243 55%, #0a2649 100%);
   color: var(--fg);
   font-family: var(--font-archivo), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -95,38 +99,42 @@ body {
    block from dark to light is one class: it re-points the contextual tokens,
    and every child follows without knowing it moved. */
 
+/* A cloud: cream-white with a blue shadow at the base. */
 .block-light {
-  --fg: #131820;
-  --fg-muted: #445162;
-  --fg-dim: #6b7887;
+  --fg: #12284a;
+  --fg-muted: #3f5878;
+  --fg-dim: #6a86a8;
   --surface: rgba(255, 255, 255, 0.6);
   --surface-lift: #ffffff;
-  --line: rgba(19, 24, 32, 0.14);
+  --line: rgba(18, 40, 74, 0.14);
   --accent: var(--ice-deep);
   --accent-deep: var(--chrome-700);
   --motif-alpha: 0.26;
-  background: linear-gradient(168deg, var(--chrome-50), var(--chrome-100) 55%, var(--chrome-200));
+  background: linear-gradient(168deg, #ffffff, var(--chrome-100) 55%, var(--chrome-200));
   color: var(--fg);
 }
 
+/* The sky. */
 .block-dark {
-  --fg: #eef3f8;
-  --fg-muted: #a3b1c0;
-  --fg-dim: #6c7b8b;
+  --fg: #f3f8ff;
+  --fg-muted: #b6c9e0;
+  --fg-dim: #7f9bbd;
   --surface: var(--ink-soft);
   --surface-lift: var(--ink-lift);
-  --line: rgba(236, 220, 244, 0.16);
-  --accent: var(--chrome-300);
-  --accent-deep: var(--chrome-500);
-  --motif-alpha: 0.55;
-  background: var(--ink);
+  --line: rgba(166, 195, 226, 0.22);
+  --accent: var(--ice);
+  --accent-deep: var(--ice-deep);
+  --motif-alpha: 0.9;
+  background: linear-gradient(180deg, #0c2d54 0%, #082243 60%, #0a2649 100%);
   color: var(--fg);
 }
 
-/* --- inflated chrome type -------------------------------------------------
-   Two stacked copies: a blurred solid behind for the puffy bloom, and a
-   gradient-clipped face on top. The gradient's hard mid-stops are what read as
-   reflections — a smooth ramp looks like plastic, not metal. */
+/* --- cartoon title type ----------------------------------------------------
+   Two stacked copies, as before, but the job has changed: the copy behind is
+   now a fat dark OUTLINE (stroked, offset down a touch) and the face on top is
+   cream-white — game-title lettering, readable from across a room. It has to
+   be two elements because a stroke drawn on the face itself eats into the
+   glyphs; behind, it only ever adds. */
 
 .chrome-wrap { position: relative; display: inline-block; line-height: 0.9; }
 
@@ -141,68 +149,30 @@ body {
 .chrome-glow {
   position: absolute;
   inset: 0;
-  color: var(--chrome-400);
-  filter: blur(14px);
-  opacity: 0.65;
-  transform: scale(1.04);
+  color: #0a1a30;
+  -webkit-text-stroke: 0.09em #0a1a30;
+  transform: translateY(0.04em);
+  filter: drop-shadow(0 0.08em 0 #0a1a30) drop-shadow(0 12px 18px rgba(0, 0, 0, 0.45));
   pointer-events: none;
 }
 
 .chrome-face {
   position: relative;
-  /* The tight, high-contrast stops around the middle are what read as a
-     reflection. A smooth ramp between the same colours looks like plastic. */
-  background-image: linear-gradient(
-    178deg,
-    #ffffff 0%,
-    #f3f7fb 6%,
-    #d2dde8 17%,
-    #a1b2c4 29%,
-    #63758a 40%,
-    #28323e 47%,
-    #46586b 50%,
-    #8b9fb4 53%,
-    #dbe5ef 60%,
-    #ffffff 68%,
-    #bacadb 78%,
-    #7a8da2 88%,
-    #465a6d 95%,
-    #a9bacc 100%
-  );
+  background-image: linear-gradient(180deg, #ffffff 0%, #fff8dc 55%, #f2e3a8 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter:
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.55))
-    drop-shadow(0 10px 22px rgba(0, 0, 0, 0.5));
 }
 
-/* On a light ground the polished gradient is unreadable: its brightest bands
-   are white, and white on white is nothing. This is the same metal lit from
-   the other side — dark body, light highlights — so it keeps the chrome
-   banding while staying legible. */
+/* On a cloud the roles flip: dark face, pale outline. */
 .block-light .chrome-glow {
-  opacity: 0.3;
-  color: var(--chrome-400);
+  color: #ffffff;
+  -webkit-text-stroke: 0.09em #ffffff;
+  filter: drop-shadow(0 0.08em 0 #ffffff) drop-shadow(0 8px 14px rgba(18, 40, 74, 0.25));
 }
 
 .block-light .chrome-face {
-  background-image: linear-gradient(
-    178deg,
-    #46586b 0%,
-    #94a8bc 12%,
-    #33404e 26%,
-    #7288a0 40%,
-    #161d25 50%,
-    #4d6076 58%,
-    #a8bccf 70%,
-    #2b3542 84%,
-    #63788e 94%,
-    #1d252f 100%
-  );
-  filter:
-    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.75))
-    drop-shadow(0 8px 16px rgba(40, 50, 62, 0.28));
+  background-image: linear-gradient(180deg, #1d3f6a 0%, #12284a 100%);
 }
 
 /* --- type ----------------------------------------------------------------- */
@@ -285,12 +255,13 @@ body {
 .btn:disabled { opacity: 0.35; cursor: not-allowed; }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* The go button: the title card's green. */
 .btn-lit {
-  background: var(--chrome-200);
-  border-color: var(--chrome-200);
-  color: #191320;
+  background: var(--acid);
+  border-color: var(--acid);
+  color: #0d2a10;
 }
-.btn-lit:hover:not(:disabled) { background: var(--chrome-100); border-color: var(--chrome-100); color: #191320; }
+.btn-lit:hover:not(:disabled) { background: #a3ee5c; border-color: #a3ee5c; color: #0d2a10; }
 
 .btn-hot {
   background: var(--loose);
@@ -522,23 +493,42 @@ body {
   pointer-events: none;
 }
 
-/* Lilac at low alpha over near-black reads as grey, so the two grounds get
-   different weights rather than one compromise value. */
 .motif {
   position: absolute;
   transform: translate(-50%, -50%);
-  animation: bob 9s ease-in-out infinite;
+  animation: twinkle 4s ease-in-out infinite;
   opacity: var(--motif-alpha, 0.4);
 }
 
-/* On a phone the same blooms cover the body copy rather than decorating it. */
-@media (max-width: 640px) {
-  .motif { scale: 0.55; opacity: calc(var(--motif-alpha, 0.4) * 0.7); }
+/* Clouds drift rather than twinkle, and sit low in the mix. */
+.motif-cloud {
+  animation: drift 26s ease-in-out infinite;
+  opacity: calc(var(--motif-alpha, 0.4) * 0.35);
 }
 
-@keyframes bob {
-  0%, 100% { transform: translate(-50%, -50%) rotate(0deg) scale(1); }
-  50%      { transform: translate(-50%, -58%) rotate(14deg) scale(1.07); }
+/* The moon is the one thing that holds still, with a soft halo. */
+.motif-moon {
+  animation: none;
+  opacity: 1;
+  filter: drop-shadow(0 0 28px rgba(255, 225, 122, 0.55));
+}
+
+/* On a phone the same sky covers the body copy rather than decorating it. */
+@media (max-width: 640px) {
+  .motif { scale: 0.6; }
+  /* On a phone the stage is narrow enough that the moon sits under the copy;
+     it fades rather than moves, so the sky still reads as the same sky. */
+  .motif-moon { scale: 0.7; opacity: 0.5; }
+}
+
+@keyframes twinkle {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: var(--motif-alpha, 0.4); }
+  50%      { transform: translate(-50%, -50%) scale(0.7); opacity: calc(var(--motif-alpha, 0.4) * 0.45); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(-50%, -50%); }
+  50%      { transform: translate(-44%, -52%); }
 }
 
 /* --- torn paper edge ------------------------------------------------------
@@ -592,6 +582,6 @@ input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border: none;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .motif, .verdict-orb-flash, .verdict-badge, .verdict-flag { animation: none; }
+  .motif, .motif-cloud, .verdict-orb-flash, .verdict-badge, .verdict-flag { animation: none; }
   * { transition-duration: 1ms !important; }
 }

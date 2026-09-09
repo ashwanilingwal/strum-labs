@@ -5,20 +5,25 @@ import { chordById } from "@/lib/music/chords";
 import {
   barOfSlot, MAX_BPM, MIN_BPM, normalise, type Pattern,
 } from "@/lib/music/pattern";
+import { levelByNumber, levelPattern } from "@/lib/music/levels";
 import { activePattern, appStore, quickPattern, QUICK_ID, type AppState, type PracticeMode } from "@/lib/storage/settings";
 import { touchLocal, useAccount } from "@/hooks/useAccount";
+import { useCountdown } from "@/hooks/useCountdown";
 import { useStrumEngine } from "@/hooks/useStrumEngine";
 import { ChordChart } from "./chart/ChordChart";
 import { ChordSequence } from "./chart/ChordSequence";
 import { LiveFeedback } from "./LiveFeedback";
 import { ChordSheet } from "./ChordSheet";
 import { ExerciseMode } from "./ExerciseMode";
+import { GameMode } from "./GameMode";
+import { bucketOf, ChordVerdict, TimingBoxes } from "./TimingBoxes";
 import { ModeToggle } from "./ModeToggle";
 import { SessionSummary } from "./SessionSummary";
 import { SettingsPanel } from "./SettingsPanel";
 import { StrumLane } from "./StrumLane";
 import { TransportBar } from "./TransportBar";
 import { ChromeText } from "./ui/ChromeText";
+import { CountdownOverlay } from "./ui/CountdownOverlay";
 import { GearIcon } from "./ui/GearIcon";
 import { MotifField } from "./ui/MotifField";
 import { Nav } from "./ui/Nav";
@@ -53,6 +58,9 @@ export function StrumLab() {
   /** The headphones advice, shown once per visit when listening starts. */
   const [headphoneTip, setHeadphoneTip] = useState(false);
   const headphoneTipSeen = useRef(false);
+  /** Resolves the game's wait for the tip to be dismissed. */
+  const tipResolver = useRef<(() => void) | null>(null);
+  const countdown = useCountdown();
 
   const setState = useCallback((updater: (prev: AppState) => AppState) => {
     appStore.set(updater);
@@ -97,10 +105,10 @@ export function StrumLab() {
     [setState],
   );
 
-  // The drum backing belongs to progressions; drilling one chord doesn't need
-  // a groove fighting the click. Memoised so the engine's refs stay stable.
+  // The drums play under everything but the exercises, which are untimed
+  // listening games. Memoised so the engine's refs stay stable.
   const audioForMode = useMemo(
-    () => ({ ...state.audio, backing: state.audio.backing && state.mode === "pattern" }),
+    () => ({ ...state.audio, backing: state.audio.backing && state.mode !== "exercise" }),
     [state.audio, state.mode],
   );
   const engine = useStrumEngine(pattern, audioForMode, state.listen);
@@ -115,20 +123,6 @@ export function StrumLab() {
    * Measured rather than guessed: the bar wraps to one row on a desktop and
    * three on a 320px phone, and a fixed spacer is wrong at every size but one.
    */
-  // Space is the universal transport key; ignore it while typing a name.
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
-      if (appStore.get().mode === "exercise") return;
-      if (e.code === "Space") {
-        e.preventDefault();
-        engine.toggle();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [engine]);
 
   const bar = engine.activeSlot >= 0 ? barOfSlot(pattern, engine.activeSlot) : 0;
   const chord = chordById(pattern.chords[bar]);
@@ -144,6 +138,16 @@ export function StrumLab() {
       setState((prev) => {
         // Exercise mode has no quick pattern to rebuild — it is games only.
         if (mode === "exercise") return { ...prev, mode };
+        // The game plays its current level through the reserved slot.
+        if (mode === "game") {
+          const lvl = levelPattern(levelByNumber(prev.game.level));
+          return {
+            ...prev,
+            mode,
+            activeId: QUICK_ID,
+            patterns: prev.patterns.map((p) => (p.id === QUICK_ID ? { ...lvl, id: QUICK_ID } : p)),
+          };
+        }
         return {
           ...prev,
           mode,
@@ -178,21 +182,69 @@ export function StrumLab() {
     window.setTimeout(() => setBlocked((cur) => (cur === message ? null : cur)), 2600);
   }, []);
 
+  // Once per visit, at the moment it becomes true: on headphones the mic
+  // hears only the guitar, so none of the app's defences against hearing
+  // itself have to work at all. Shown while listening starts, not instead
+  // of it — the game calls this too.
+  const noteListenStart = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        if (headphoneTipSeen.current) {
+          resolve();
+          return;
+        }
+        headphoneTipSeen.current = true;
+        tipResolver.current = resolve;
+        setHeadphoneTip(true);
+      }),
+    [],
+  );
+  const closeTip = useCallback(() => {
+    setHeadphoneTip(false);
+    tipResolver.current?.();
+    tipResolver.current = null;
+  }, []);
+
   const handleMic = () => {
     if (engine.micStatus === "off" || engine.micStatus === "error") {
-      // Once per visit, at the moment it becomes true: on headphones the mic
-      // hears only the guitar, so none of the app's defences against hearing
-      // itself have to work at all. Shown while listening starts, not
-      // instead of it.
-      if (!headphoneTipSeen.current) {
-        headphoneTipSeen.current = true;
-        setHeadphoneTip(true);
-      }
+      void noteListenStart();
       void engine.startListening();
     } else {
       engine.stopListening();
     }
   };
+
+  // Free play gets the same 3-2-1 as a level: time to pick the guitar up
+  // before the count-in clicks. Pressing Play again during the count cancels.
+  const startWithCountdown = useCallback(async () => {
+    if (engine.playing || countdown.n !== null) return;
+    const counted = await countdown.run(3);
+    if (counted) await engine.start();
+  }, [engine, countdown]);
+  const toggleTransport = useCallback(() => {
+    if (engine.playing || countdown.n !== null) {
+      countdown.cancel();
+      engine.stop();
+    } else {
+      void startWithCountdown();
+    }
+  }, [engine, countdown, startWithCountdown]);
+
+  // Space is the universal transport key; ignore it while typing a name.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      const mode = appStore.get().mode;
+      if (mode === "exercise" || mode === "game") return;
+      if (e.code === "Space") {
+        e.preventDefault();
+        toggleTransport();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [toggleTransport]);
 
   const notices = [
     engine.micMessage ? { tone: "loose", text: engine.micMessage } : null,
@@ -228,7 +280,16 @@ export function StrumLab() {
           />
         </div>
       </div>
-      {state.mode === "exercise" ? (
+      {state.mode === "game" ? (
+        <GameMode
+          engine={engine}
+          state={state}
+          setState={setState}
+          pattern={pattern}
+          onSettings={() => setSettingsOpen(true)}
+          onListenStart={noteListenStart}
+        />
+      ) : state.mode === "exercise" ? (
         <ExerciseMode
           bpm={state.exerciseBpm}
           onNudgeBpm={(delta) =>
@@ -276,6 +337,7 @@ export function StrumLab() {
         <div className="wrap relative z-10 flex w-full flex-col items-center gap-4">
           <div className="flex w-full items-center justify-center gap-4 sm:gap-10">
             <div className="min-w-0 text-center">
+              <ChordVerdict verdict={engine.lastVerdict} show={showVerdicts} seq={engine.verdictSeq} />
               <p className="caps text-fg-dim">
                 {engine.countIn > 0
                   ? "Count in"
@@ -394,6 +456,15 @@ export function StrumLab() {
 
       {showVerdicts ? (
         <section className="px-4 py-4 sm:px-8">
+          <div className="mx-auto mb-3 max-w-md">
+            <TimingBoxes
+              early={engine.stats.early}
+              onTime={engine.stats.tight}
+              late={engine.stats.late}
+              last={bucketOf(engine.lastVerdict)}
+              seq={engine.verdictSeq}
+            />
+          </div>
           <LiveFeedback
             lastVerdict={engine.lastVerdict}
             verdictSeq={engine.verdictSeq}
@@ -453,8 +524,8 @@ export function StrumLab() {
       <div className="shrink-0 border-t border-line bg-ink/95 px-4 py-3 sm:px-8">
         <div className="wrap">
         <TransportBar
-          playing={engine.playing}
-          onToggle={engine.toggle}
+          playing={engine.playing || countdown.n !== null}
+          onToggle={toggleTransport}
           bpm={pattern.bpm}
           onBpm={setBpm}
           onNudgeBpm={nudgeBpm}
@@ -462,7 +533,7 @@ export function StrumLab() {
           onClick={(v) => setState((s) => ({ ...s, audio: { ...s.audio, click: v } }))}
           guitar={state.audio.guitar}
           onGuitar={(v) => setState((s) => ({ ...s, audio: { ...s.audio, guitar: v } }))}
-          backing={state.mode === "pattern" ? state.audio.backing : undefined}
+          backing={state.audio.backing}
           onBacking={(v) => setState((s) => ({ ...s, audio: { ...s.audio, backing: v } }))}
           micStatus={engine.micStatus}
           onMic={handleMic}
@@ -474,7 +545,8 @@ export function StrumLab() {
       </>
       )}
 
-      {headphoneTip ? <HeadphoneTip onClose={() => setHeadphoneTip(false)} /> : null}
+      {headphoneTip ? <HeadphoneTip onClose={closeTip} /> : null}
+      {state.mode !== "game" ? <CountdownOverlay n={countdown.n} /> : null}
 
       {chordSheetBar !== null ? (
         <ChordSheet
@@ -485,7 +557,7 @@ export function StrumLab() {
         />
       ) : null}
 
-      {engine.summary ? (
+      {engine.summary && state.mode !== "game" ? (
         <SessionSummary
           stats={engine.summary}
           checkChord={state.listen.checkChord}
@@ -493,7 +565,7 @@ export function StrumLab() {
           onDismiss={engine.dismissSummary}
           onAgain={() => {
             engine.dismissSummary();
-            void engine.start();
+            void startWithCountdown();
           }}
         />
       ) : null}

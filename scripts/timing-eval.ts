@@ -27,7 +27,21 @@ if (process.env.DEBUG_ONSETS) {
 const SR = 44100;
 const CHUNK = 512;
 /** How far ahead the real transport books slots (transport.ts LOOKAHEAD_S). */
-const LOOKAHEAD_S = 0.12;
+const LOOKAHEAD_S = 0.3;
+
+/** As useStrumEngine computes it: shortest gap between audible slots, wrapping. */
+function minStrumGapOf(p: Pattern): number {
+  const audible = p.strokes.map((st, i) => (isAudible(st) ? i : -1)).filter((i) => i >= 0);
+  const slotS = slotSeconds(p, p.bpm);
+  if (audible.length < 2) return slotS * p.strokes.length;
+  let min = Infinity;
+  for (let k = 0; k < audible.length; k++) {
+    const next = audible[(k + 1) % audible.length];
+    const gap = ((next - audible[k] + p.strokes.length) % p.strokes.length) || p.strokes.length;
+    min = Math.min(min, gap);
+  }
+  return min * slotS;
+}
 
 function makeRand(seed: number) {
   let s = seed >>> 0;
@@ -122,6 +136,8 @@ function runSession(
     offsetMs?: number; noiseAmp?: number; calibrate?: boolean;
     /** Render without pick scrape and with eased attacks — bare thumb. */
     fingerstyle?: boolean;
+    /** Seconds between successive strings of each strum. */
+    staggerS?: number;
   } = {},
 ): { verdicts: SlotVerdict[]; onsets: Onset[]; roomQuality: string | null } {
   const noiseAmp = opts.noiseAmp ?? 0.0005;
@@ -135,7 +151,10 @@ function runSession(
       continue;
     }
     const midis = chordMidiNotes(chordById(s.chordId)!);
-    const render = opts.fingerstyle ? { scrape: 0.015, attackS: 0.006 } : {};
+    const render = {
+      ...(opts.fingerstyle ? { scrape: 0.015, attackS: 0.006 } : {}),
+      ...(opts.staggerS ? { staggerS: opts.staggerS } : {}),
+    };
     if (s.stroke === "up") {
       renderStrum(audio, s.timeS, midis.slice(-4).reverse(), rand, { gain: 0.7, ...render });
     } else {
@@ -154,8 +173,10 @@ function runSession(
     onsets.push(o);
     scorer.hear(o);
   });
-  // Mirror useStrumEngine: the merge window follows the pattern's slot pace.
+  // Mirror useStrumEngine: the merge window follows the pattern's slot pace,
+  // and a rake may be merged for up to 60% of the shortest real-strum gap.
   detector.maxStrumSpreadS = Math.min(0.11, Math.max(0.07, slotS * 0.5));
+  detector.minStrumGapS = minStrumGapOf(pattern);
   const scorer = new Scorer(pattern, pattern.bpm, opts.offsetMs ?? 0, (v) => verdicts.push(v));
 
   // The app always measures the room before listening; scenarios that care
@@ -569,7 +590,139 @@ function renderClick(out: Float32Array, startS: number, accent: boolean, gain: n
   }
 }
 
-function scenarioClickBleed(withStrums: boolean) {
+
+/** RBJ biquad, run over a whole buffer in place. Enough filter for a drum kit. */
+function biquad(buf: Float32Array, kind: "bandpass" | "highpass", f0: number, q: number) {
+  const w0 = (2 * Math.PI * f0) / SR;
+  const alpha = Math.sin(w0) / (2 * q);
+  const cosw = Math.cos(w0);
+  let b0: number, b1: number, b2: number;
+  if (kind === "bandpass") {
+    b0 = alpha; b1 = 0; b2 = -alpha;
+  } else {
+    b0 = (1 + cosw) / 2; b1 = -(1 + cosw); b2 = (1 + cosw) / 2;
+  }
+  const a0 = 1 + alpha, a1 = -2 * cosw, a2 = 1 - alpha;
+  let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+  for (let i = 0; i < buf.length; i++) {
+    const x0 = buf[i];
+    const y0 = (b0 / a0) * x0 + (b1 / a0) * x1 + (b2 / a0) * x2 - (a1 / a0) * y1 - (a2 / a0) * y2;
+    x2 = x1; x1 = x0; y2 = y1; y1 = y0;
+    buf[i] = y0;
+  }
+}
+
+/**
+ * One hit of the app's backing kit, synthesised the way engine.drum() does it:
+ * a 140→48 Hz sine kick, band-passed noise over a 190 Hz tone for the snare,
+ * high-passed noise for the hat. Levels are the engine's, through its 0.5 bus.
+ */
+function renderDrum(out: Float32Array, startS: number, kind: "kick" | "snare" | "hat", rand: () => number) {
+  const start = Math.floor(startS * SR);
+  const bus = 0.5;
+  if (kind === "kick") {
+    const n = Math.floor(SR * 0.2);
+    let phase = 0;
+    for (let i = 0; i < n && start + i < out.length; i++) {
+      const t = i / SR;
+      const f = 48 + (140 - 48) * Math.exp(-t / 0.035);
+      phase += (2 * Math.PI * f) / SR;
+      const env = t < 0.004 ? t / 0.004 : Math.exp(-(t - 0.004) / 0.028);
+      out[start + i] += bus * 0.85 * env * Math.sin(phase);
+    }
+    return;
+  }
+  const n = Math.floor(SR * 0.15);
+  const noise = new Float32Array(n);
+  for (let i = 0; i < n; i++) noise[i] = rand() * 2 - 1;
+  if (kind === "snare") {
+    biquad(noise, "bandpass", 1800, 0.8);
+    for (let i = 0; i < n && start + i < out.length; i++) {
+      const t = i / SR;
+      const env = t < 0.002 ? t / 0.002 : Math.exp(-(t - 0.002) / 0.02);
+      const tone = t < 0.08 ? 0.35 * Math.exp(-t / 0.014) * (2 / Math.PI) * Math.asin(Math.sin(2 * Math.PI * 190 * t)) : 0;
+      out[start + i] += bus * (0.5 * env * noise[i] + tone);
+    }
+  } else {
+    biquad(noise, "highpass", 6500, 0.7);
+    for (let i = 0; i < n && start + i < out.length; i++) {
+      const t = i / SR;
+      const env = t < 0.001 ? t / 0.001 : Math.exp(-(t - 0.001) / 0.007);
+      out[start + i] += bus * 0.18 * env * noise[i];
+    }
+  }
+}
+
+/**
+ * The calibration's latency probe: three clicks scheduled at known times come
+ * back through the "mic" a fixed round trip later. endCalibration must read
+ * that round trip off them, and must not let them pollute the room floor.
+ */
+function scenarioLoopback() {
+  const rand = makeRand(5);
+  for (const trueMs of [18, 37, 64]) {
+    const len = Math.ceil(SR * 2.2);
+    const audio = new Float32Array(len);
+    for (let i = 0; i < len; i++) audio[i] = (rand() * 2 - 1) * 0.002;
+    const probes = [0.65, 1.0, 1.35];
+    for (const p of probes) renderClick(audio, p + trueMs / 1000, false, 0.12);
+    const detector = new OnsetDetector(SR, () => {});
+    detector.beginCalibration();
+    for (let i = 0; i + CHUNK <= len; i += CHUNK) detector.push(i / SR, audio.subarray(i, i + CHUNK));
+    const room = detector.endCalibration(probes);
+    const ok = room.loopbackMs !== null && Math.abs(room.loopbackMs - trueMs) <= 8;
+    console.log(
+      `\n== loopback probe: true ${trueMs} ms → measured ${room.loopbackMs ?? "null"} ms, ` +
+      `room read as ${room.quality} ${ok ? "PASS" : "FAIL"} ==`,
+    );
+  }
+  // Headphones: the clicks never come back. Must say so, not invent a number.
+  const len = Math.ceil(SR * 2.2);
+  const quiet = new Float32Array(len);
+  for (let i = 0; i < len; i++) quiet[i] = (rand() * 2 - 1) * 0.002;
+  const d2 = new OnsetDetector(SR, () => {});
+  d2.beginCalibration();
+  for (let i = 0; i + CHUNK <= len; i += CHUNK) d2.push(i / SR, quiet.subarray(i, i + CHUNK));
+  const silentRoom = d2.endCalibration([0.65, 1.0, 1.35]);
+  console.log(`== loopback probe, nothing comes back: measured ${silentRoom.loopbackMs ?? "null"} ${silentRoom.loopbackMs === null ? "PASS" : "FAIL"} ==`);
+}
+
+/**
+ * Strums that are not a snap: a slow rake across the strings (40 ms per
+ * string, ~200 ms end to end) and a very slow one (60 ms, ~300 ms). A
+ * beginner's strum often looks like this. Each must count as ONE strum,
+ * timed at its first string, and must not spawn extras from its stragglers.
+ */
+function scenarioSlowRakes() {
+  for (const stagger of [0.025, 0.04, 0.06]) {
+    const pattern = normalise({
+      id: "sr", name: "sr", bars: 1, slotsPerBar: 8, beatsPerBar: 4,
+      strokes: ["D", "-", "D", "-", "D", "-", "D", "-"],
+      accents: [], chords: ["G"], bpm: 80,
+    });
+    const slotS = slotSeconds(pattern, pattern.bpm);
+    const t0 = 1.0;
+    const strums: Strum[] = [];
+    for (let c = 0; c < 2; c++) {
+      for (const i of [0, 2, 4, 6]) {
+        strums.push({ timeS: t0 + (c * 8 + i) * slotS, chordId: "G", slot: i, errorMs: 0 });
+      }
+    }
+    const { verdicts, onsets } = runSession(pattern, 2, strums, t0, { staggerS: stagger });
+    const t = tally(verdicts);
+    const errs = verdicts.filter((v) => v.grade !== "missed" && v.grade !== "extra").map((v) => v.errorMs);
+    const mean = errs.reduce((a, b) => a + b, 0) / (errs.length || 1);
+    if (process.env.DEBUG_ONSETS) {
+      console.log(`  rake ${Math.round(stagger * 1000)}ms onsets: ${onsets.map((o) => (o.time - t0).toFixed(3)).join(" ")}`);
+    }
+    console.log(
+      `\n== slow rake: ${Math.round(stagger * 1000)} ms per string (${Math.round(stagger * 5000)} ms end to end), downs at 80 bpm ==` +
+      `\nstrums 8, onsets ${onsets.length}, hits ${t.hits}, missed ${t.missed}, extras ${t.extras}, mean error ${mean.toFixed(0)}ms`,
+    );
+  }
+}
+
+function scenarioClickBleed(withStrums: boolean, withKit = false) {
   const pattern = normalise({
     id: "cb", name: "cb", bars: 1, slotsPerBar: 8, beatsPerBar: 4,
     strokes: ["D", "-", "D", "U", "-", "U", "D", "U"],
@@ -588,12 +741,21 @@ function scenarioClickBleed(withStrums: boolean) {
   const rand = makeRand(11);
   const beatEvery = 8 / pattern.beatsPerBar;
   const clickTimes: number[] = [];
+  const drumTimes: number[] = [];
   for (let c = 0; c < loops; c++) {
     for (let i = 0; i < 8; i++) {
-      if (i % beatEvery !== 0) continue;
       const at = t0 + (c * 8 + i) * slotS;
-      clickTimes.push(at);
-      renderClick(audio, at, i === 0, 0.18);
+      if (i % beatEvery === 0) {
+        clickTimes.push(at);
+        renderClick(audio, at, i === 0, 0.18);
+      }
+      if (withKit) {
+        // performSlot's groove: kick on beats 1 and 3, snare on 2 and 4,
+        // a hat on every eighth.
+        if (i % beatEvery === 0) renderDrum(audio, at, (i / beatEvery) % 2 === 0 ? "kick" : "snare", rand);
+        renderDrum(audio, at, "hat", rand);
+        drumTimes.push(at);
+      }
     }
   }
   let expectedStrums = 0;
@@ -618,9 +780,11 @@ function scenarioClickBleed(withStrums: boolean) {
     scorer.hear(o);
   });
   detector.maxStrumSpreadS = Math.min(0.11, Math.max(0.07, slotS * 0.5));
+  detector.minStrumGapS = minStrumGapOf(pattern);
   const scorer = new Scorer(pattern, pattern.bpm, 0, (v) => verdicts.push(v));
   // What useStrumEngine does: hand the scorer the clicks the app played.
   scorer.clickTimes = clickTimes;
+  scorer.drumTimes = drumTimes;
 
   const schedule: { slot: number; cycle: number; time: number }[] = [];
   for (let c = 0; c < loops; c++) {
@@ -647,7 +811,7 @@ function scenarioClickBleed(withStrums: boolean) {
 
   const t = tally(verdicts);
   if (withStrums) {
-    console.log(`\n== click + playing: metronome AND the player, both on the beat ==`);
+    console.log(`\n== ${withKit ? "click + drums" : "click"} + playing: the app's own sounds AND the player, on the beat ==`);
     console.log(
       `strums ${expectedStrums} over ${clickTimes.length} clicks, onsets ${onsets.length}, ` +
       `hits ${t.hits} (want ${expectedStrums}), missed ${t.missed}, extras ${t.extras}`,
@@ -658,15 +822,20 @@ function scenarioClickBleed(withStrums: boolean) {
         `  missed slots: ${verdicts.filter((v) => v.grade === "missed").map((v) => `c${v.cycle}s${v.slot}`).join(" ")}`,
       );
       console.log(
-        `  onsets: ${onsets.map((o) => `${(o.time - t0).toFixed(3)}${onBeat(o.time) ? "*" : ""}(body${o.bodyRise.toFixed(2)})`).join(" ")}`,
+        `  onsets: ${onsets.map((o) => `${(o.time - t0).toFixed(3)}${onBeat(o.time) ? "*" : ""}(body${o.bodyRise.toFixed(1)} sus${o.sustain.toFixed(2)})`).join(" ")}`,
       );
     }
   } else {
-    console.log(`\n== click bleed: metronome only, player silent ==`);
+    console.log(`\n== ${withKit ? "click + drums" : "click"} bleed: app's own sounds only, player silent ==`);
     console.log(
       `clicks ${clickTimes.length}, onsets ${onsets.length}, ` +
       `phantom hits ${t.hits} (must be 0), extras ${t.extras}`,
     );
+    if (process.env.DEBUG_ONSETS) {
+      console.log(
+        `  onsets: ${onsets.map((o) => `${(o.time - t0).toFixed(3)}(body${o.bodyRise.toFixed(1)} sus${o.sustain.toFixed(2)})`).join(" ")}`,
+      );
+    }
   }
 }
 
@@ -710,3 +879,7 @@ scenarioTempos();
 scenarioFingerstyle();
 scenarioClickBleed(false);
 scenarioClickBleed(true);
+scenarioClickBleed(false, true);
+scenarioClickBleed(true, true);
+scenarioLoopback();
+scenarioSlowRakes();

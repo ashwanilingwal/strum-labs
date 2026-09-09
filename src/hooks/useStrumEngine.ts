@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getEngine } from "@/lib/audio/engine";
 import { performSlot } from "@/lib/audio/perform";
 import { Transport } from "@/lib/audio/transport";
-import { beatSlots, slotSeconds, type Pattern } from "@/lib/music/pattern";
+import { beatSlots, isAudible, slotSeconds, type Pattern } from "@/lib/music/pattern";
 import {
   MIN_STRUM_SPREAD_S, OnsetDetector, STRUM_MERGE_S, type Onset, type RoomProfile,
 } from "@/lib/listen/detector";
@@ -42,6 +42,10 @@ export interface HeardNote {
 }
 
 const CALIBRATION_MS = 2200;
+/** The room settles for this long before the probe clicks go out. */
+const PROBE_LEAD_MS = 600;
+/** Probe click offsets after the lead, seconds. Spaced past PROBE_WINDOW_S. */
+const PROBE_OFFSETS_S = [0.05, 0.4, 0.75];
 
 /**
  * The detector's same-strum merge window for this pattern: never wider than
@@ -52,6 +56,23 @@ function strumSpread(p: Pattern): number {
   return Math.min(STRUM_MERGE_S, Math.max(MIN_STRUM_SPREAD_S, slotSeconds(p, p.bpm) * 0.5));
 }
 
+/**
+ * The shortest gap between two real strums in the pattern, in seconds —
+ * consecutive audible slots, wrapping round the loop. Bounds how long the
+ * detector may treat late strings as part of one slow rake.
+ */
+function minStrumGap(p: Pattern): number {
+  const audible = p.strokes.map((s, i) => (isAudible(s) ? i : -1)).filter((i) => i >= 0);
+  if (audible.length < 2) return slotSeconds(p, p.bpm) * p.strokes.length;
+  let min = Infinity;
+  for (let k = 0; k < audible.length; k++) {
+    const next = audible[(k + 1) % audible.length];
+    const gap = ((next - audible[k] + p.strokes.length) % p.strokes.length) || p.strokes.length;
+    min = Math.min(min, gap);
+  }
+  return min * slotSeconds(p, p.bpm);
+}
+
 /** How often the screen re-reads the audio clock. See the ui loop below. */
 const UI_TICK_MS = 25;
 
@@ -60,6 +81,8 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
   const [playing, setPlaying] = useState(false);
   const [activeSlot, setActiveSlot] = useState(-1);
+  /** Which pass through the loop is sounding. The game ends a level on it. */
+  const [cycle, setCycle] = useState(0);
   const [countIn, setCountIn] = useState(0);
 
   const [sampleState, setSampleState] = useState<SamplerState>("idle");
@@ -108,7 +131,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   const detectorRef = useRef<OnsetDetector | null>(null);
   const captureRef = useRef<MicCapture | null>(null);
   /** Slot changes queued against audio time, drained by the rAF loop. */
-  const uiQueue = useRef<{ slot: number; time: number }[]>([]);
+  const uiQueue = useRef<{ slot: number; cycle: number; time: number }[]>([]);
 
   // ---- transport ---------------------------------------------------------
 
@@ -119,7 +142,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
       performSlot(engine, p, slot, time, { guitar: a.guitar, click: a.click, backing: a.backing });
       scorerRef.current?.expect(slot, cycle, time);
-      uiQueue.current.push({ slot, time });
+      uiQueue.current.push({ slot, cycle, time });
     },
     [engine],
   );
@@ -143,7 +166,10 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       slotSeconds: () => slotSeconds(patternRef.current, patternRef.current.bpm),
     });
     scorerRef.current?.update(pattern, pattern.bpm);
-    if (detectorRef.current) detectorRef.current.maxStrumSpreadS = strumSpread(pattern);
+    if (detectorRef.current) {
+      detectorRef.current.maxStrumSpreadS = strumSpread(pattern);
+      detectorRef.current.minStrumGapS = minStrumGap(pattern);
+    }
   }, [pattern]);
 
   useEffect(() => {
@@ -205,6 +231,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     uiQueue.current = [];
     setPlaying(false);
     setActiveSlot(-1);
+    setCycle(0);
     setCountIn(0);
     // Only worth a summary if the microphone actually judged something.
     if (statsRef.current.hits + statsRef.current.missed > 0) {
@@ -281,11 +308,15 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
 
       // Reveal slots at the moment they actually sound.
       let next = -1;
+      let nextCycle = -1;
       while (uiQueue.current.length && uiQueue.current[0].time <= now) {
-        next = uiQueue.current.shift()!.slot;
+        const due = uiQueue.current.shift()!;
+        next = due.slot;
+        nextCycle = due.cycle;
       }
       if (next >= 0) {
         setActiveSlot(next);
+        setCycle(nextCycle);
         // A fresh loop wipes last cycle's marks so the lane reads as "now".
         if (next === 0) setVerdicts({});
       }
@@ -320,7 +351,10 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     // Refreshed at the moment of judging rather than on a timer: the scorer
     // must see every click that has sounded, including one scheduled inside
     // the transport's lookahead a fraction of a second ago.
-    if (scorerRef.current) scorerRef.current.clickTimes = engine.clickTimes;
+    if (scorerRef.current) {
+      scorerRef.current.clickTimes = engine.clickTimes;
+      scorerRef.current.drumTimes = engine.drumTimes;
+    }
     setHeard({
       chord: l.checkChord ? o.chordGuess : null,
       confidence: o.chordConfidence,
@@ -344,7 +378,23 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
     setRecent([]);
   }, [engine]);
 
-  const startListening = useCallback(async () => {
+  /**
+   * The calibration's clock: wait for the room to settle, play the probe
+   * clicks, wait out the rest of the measurement. Returns the clicks' audio
+   * times for endCalibration to look them up by.
+   */
+  const runProbes = useCallback(async (detector: OnsetDetector): Promise<number[]> => {
+    await new Promise((r) => window.setTimeout(r, PROBE_LEAD_MS));
+    if (detectorRef.current !== detector) return [];
+    const base = engine.currentTime;
+    const probes = PROBE_OFFSETS_S.map((d) => base + d);
+    probes.forEach((t, i) => engine.click(t, i === 0));
+    await new Promise((r) => window.setTimeout(r, CALIBRATION_MS - PROBE_LEAD_MS));
+    return probes;
+  }, [engine]);
+
+  /** Resolves true once the mic is listening, false if it could not be. */
+  const startListening = useCallback(async (): Promise<boolean> => {
     setMicMessage(null);
     setMicStatus("opening");
     try {
@@ -353,6 +403,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       const ctx = engine.context!;
       const detector = new OnsetDetector(ctx.sampleRate, handleOnset);
       detector.maxStrumSpreadS = strumSpread(patternRef.current);
+      detector.minStrumGapS = minStrumGap(patternRef.current);
       detectorRef.current = detector;
 
       const capture = await openMic(ctx, ({ time, samples }) => {
@@ -370,33 +421,44 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
       scorer.guitarAudible = audioRef.current.guitar && listenRef.current.duckMode !== "mute";
       scorerRef.current = scorer;
 
-      // Measure the room before trusting anything it says.
+      // Measure the room before trusting anything it says — and, while
+      // measuring, play three clicks and time their return through the mic:
+      // the one honest number for the latency the scorer must subtract.
       setMicStatus("calibrating");
       detector.beginCalibration();
-      await new Promise((r) => window.setTimeout(r, CALIBRATION_MS));
-      if (detectorRef.current !== detector) return; // torn down mid-calibration
-      const profile = detector.endCalibration();
+      const probes = await runProbes(detector);
+      if (detectorRef.current !== detector) return false; // torn down mid-calibration
+      const profile = detector.endCalibration(probes);
       setRoom(profile);
+      // Manual setting wins; the measurement beats the device's own guess.
+      scorer.offsetMs = listenRef.current.offsetMs || profile.loopbackMs || estimateOffsetMs(ctx);
       detector.reset();
       setMicStatus("listening");
+      return true;
     } catch (err) {
       stopListening();
       setMicStatus("error");
       setMicMessage(err instanceof MicError ? err.message : "The microphone couldn't be started.");
+      return false;
     }
-  }, [engine, fetchSamples, handleOnset, handleVerdict, stopListening]);
+  }, [engine, fetchSamples, handleOnset, handleVerdict, stopListening, runProbes]);
 
   const recalibrate = useCallback(async () => {
     const detector = detectorRef.current;
     if (!detector) return;
     setMicStatus("calibrating");
     detector.beginCalibration();
-    await new Promise((r) => window.setTimeout(r, CALIBRATION_MS));
+    const probes = await runProbes(detector);
     if (detectorRef.current !== detector) return;
-    setRoom(detector.endCalibration());
+    const profile = detector.endCalibration(probes);
+    setRoom(profile);
+    if (scorerRef.current) {
+      scorerRef.current.offsetMs =
+        listenRef.current.offsetMs || profile.loopbackMs || estimateOffsetMs(engine.context);
+    }
     detector.reset();
     setMicStatus("listening");
-  }, []);
+  }, [engine, runProbes]);
 
   /** Zero out a consistent early/late bias measured from the player's own hits. */
   const absorbBias = useCallback((): number | null => {
@@ -413,7 +475,7 @@ export function useStrumEngine(pattern: Pattern, audio: AudioSettings, listen: L
   }, []);
 
   return {
-    playing, activeSlot, countIn, toggle, start, stop,
+    playing, activeSlot, cycle, countIn, toggle, start, stop,
     micStatus, micMessage, room, level, listening, sampleState,
     startListening, stopListening, recalibrate, absorbBias,
     verdicts, lastVerdict, verdictSeq, recent, stats, heard,
