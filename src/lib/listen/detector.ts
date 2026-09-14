@@ -22,7 +22,9 @@ import {
   normalise, NOTE_BINS, NOTE_HIGH_MIDI, NOTE_LOW_MIDI, noteEnergies,
   rms, spectralCentroid, spectralFlux,
 } from "./dsp";
-import { CHORDS, chordBassPitchClass, chordMidiNotes, type Chord } from "../music/chords";
+import {
+  CHORDS, chordIsSubset, chordMidiNotes, chordVoicings, isPowerChord, type Chord,
+} from "../music/chords";
 import { midiToFreq, pitchClassOf } from "../music/theory";
 
 const FFT_SIZE = 1024;
@@ -244,6 +246,9 @@ export interface Onset {
   /** Best-matching chord id, and how confident that match is (0..1). */
   chordGuess: string | null;
   chordConfidence: number;
+  /** The three best-matching chords, best first. Diagnostics: shows WHAT a
+   *  weak margin was split with (scripts/wav-eval.ts on real recordings). */
+  chordRanking: { id: string; score: number }[];
   /** Raw match score and its margin over the runner-up. Diagnostics — they
    *  exist so scripts/chord-match-eval.ts can calibrate chordConfidence. */
   matchScore: number;
@@ -334,9 +339,9 @@ const NOTE_HARMONICS: { step: number; weight: number }[] = [
 ];
 
 /** A chord's expected per-note energy profile over the measured range. */
-function noteTemplate(chord: Chord): Float32Array {
+function noteTemplate(chord: Chord, frets: number[]): Float32Array {
   const t = new Float32Array(NOTE_BINS);
-  chordMidiNotes(chord).forEach((midi, i) => {
+  chordMidiNotes(chord, frets).forEach((midi, i) => {
     const voiceWeight = i === 0 ? 1.6 : 1;
     for (const h of NOTE_HARMONICS) {
       const m = midi + h.step;
@@ -347,11 +352,14 @@ function noteTemplate(chord: Chord): Float32Array {
   return normalise(t);
 }
 
-const TEMPLATES: { chord: Chord; template: Float32Array; bass: number }[] = CHORDS.map((chord) => ({
-  chord,
-  template: noteTemplate(chord),
-  bass: chordBassPitchClass(chord),
-}));
+/** One template per accepted voicing; a chord scores as its best voicing. */
+const TEMPLATES: { chord: Chord; template: Float32Array; bass: number }[] = CHORDS.flatMap((chord) =>
+  chordVoicings(chord).map((frets) => ({
+    chord,
+    template: noteTemplate(chord, frets),
+    bass: pitchClassOf(chordMidiNotes(chord, frets)[0]),
+  })),
+);
 
 /** Samples held for bass tracking. Zero-padded to BASS_FFT before transform. */
 const BASS_WINDOW = 2048;
@@ -964,22 +972,34 @@ export class OnsetDetector {
         energies[i] = Math.max(0, energies[i] - RING_SUBTRACT * pre[i]);
       }
     }
+    // Compress before matching. A real guitar's third rings several dB under
+    // its root and fifth (the root's harmonics reinforce the fifth, nothing
+    // reinforces the third), and on linear amplitudes the loud pair swamped
+    // it: a recorded D read as D5, a recorded G as G5. Under a square root
+    // the weak note still counts — and the synthetic set rose from 94/92/87%
+    // to 100% on all three tiers (scripts/chord-match-eval.ts). A cube root
+    // over-flattens: it loses a synthetic Gmaj7 and the recorded Em's margin.
+    for (let i = 0; i < NOTE_BINS; i++) energies[i] = Math.sqrt(energies[i]);
     normalise(energies);
     const avg = foldToChroma(energies, new Float32Array(12));
 
     const heardBass = detectBassPitchClass(this.bassRing, this.sampleRate);
 
-    let best: { id: string; score: number } | null = null;
-    let runnerUp = -Infinity;
+    const byChord = new Map<Chord, number>();
     for (const { chord, template, bass } of TEMPLATES) {
       const score = matchScore(energies, template, bass, heardBass);
-      if (!best || score > best.score) {
-        runnerUp = best?.score ?? 0;
-        best = { id: chord.id, score };
-      } else if (score > runnerUp) {
-        runnerUp = score;
-      }
+      if (score > (byChord.get(chord) ?? -Infinity)) byChord.set(chord, score);
     }
+    const ranked = [...byChord].sort((a, b) => b[1] - a[1]);
+    const ranking = ranked.map(([chord, score]) => ({ id: chord.id, score }));
+    const best = ranking[0] ?? null;
+    // A chord's own power chord is not a competitor: on a real guitar the
+    // third rings under the root and fifth, so the full chord and its
+    // root-fifth subset always score close together. Counting that as doubt
+    // left a cleanly recorded D at margin 0.07 (D 0.33 vs D5 0.26) when its
+    // nearest REAL rival, Dsus2, sat at 0.09.
+    const rival = ranked.find(([chord], i) => i > 0 && !(isPowerChord(chord) && chordIsSubset(chord, ranked[0][0])));
+    const runnerUp = rival?.[1] ?? 0;
     // Confidence is the *margin* over the next-best chord, and nothing else.
     // Chords share notes, so an absolute score means very little on its own —
     // measured on the synthetic set, wrong guesses actually had *higher*
@@ -1022,6 +1042,7 @@ export class OnsetDetector {
       chordGuess: best?.id ?? null,
       chordConfidence,
       matchScore: best?.score ?? 0,
+      chordRanking: ranking.slice(0, 3),
       matchMargin: margin,
       lowRatio,
       bodyRise,

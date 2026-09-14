@@ -26,15 +26,22 @@ export interface Chord {
   barre?: { fret: number; from: number; to: number; finger: number };
   tier: ChordTier;
   tip: string;
+  /**
+   * Other shapes the microphone accepts as this chord. The diagram and the
+   * synth use `frets`; the matcher templates every voicing. Real players do
+   * not stick to the diagram: a recorded G was the 320033 shape (D on the B
+   * string, no B3) and matched G5 over the 320003 template at full confidence.
+   */
+  voicings?: number[][];
 }
 
 export const CHORDS: Chord[] = [
   // ---- open majors ----
-  { id: "C", symbol: "C", name: "C major", frets: [-1, 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0], baseFret: 1, tier: "open", tip: "Keep the ring finger anchored — it's the pivot into Am and Em." },
+  { id: "C", symbol: "C", name: "C major", frets: [-1, 3, 2, 0, 1, 0], fingers: [0, 3, 2, 0, 1, 0], baseFret: 1, tier: "open", tip: "Keep the ring finger anchored — it's the pivot into Am and Em.", voicings: [[0, 3, 2, 0, 1, 0]] },
   { id: "A", symbol: "A", name: "A major", frets: [-1, 0, 2, 2, 2, 0], fingers: [0, 0, 1, 2, 3, 0], baseFret: 1, tier: "open", tip: "Three fingers crammed into one fret. Roll them slightly so the high E rings." },
-  { id: "G", symbol: "G", name: "G major", frets: [3, 2, 0, 0, 0, 3], fingers: [3, 2, 0, 0, 0, 4], baseFret: 1, tier: "open", tip: "Use ring and pinky on the outer strings — it makes G to C almost free." },
+  { id: "G", symbol: "G", name: "G major", frets: [3, 2, 0, 0, 0, 3], fingers: [3, 2, 0, 0, 0, 4], baseFret: 1, tier: "open", tip: "Use ring and pinky on the outer strings — it makes G to C almost free.", voicings: [[3, 2, 0, 0, 3, 3]] },
   { id: "E", symbol: "E", name: "E major", frets: [0, 2, 2, 1, 0, 0], fingers: [0, 2, 3, 1, 0, 0], baseFret: 1, tier: "open", tip: "The shape every barre chord is built from. Learn it with fingers 2-3-1, not 1-2-3." },
-  { id: "D", symbol: "D", name: "D major", frets: [-1, -1, 0, 2, 3, 2], fingers: [0, 0, 0, 1, 3, 2], baseFret: 1, tier: "open", tip: "Don't hit the low E. Aim the strum at the D string." },
+  { id: "D", symbol: "D", name: "D major", frets: [-1, -1, 0, 2, 3, 2], fingers: [0, 0, 0, 1, 3, 2], baseFret: 1, tier: "open", tip: "Don't hit the low E. Aim the strum at the D string.", voicings: [[-1, 0, 0, 2, 3, 2]] },
   // ---- open minors ----
   { id: "Am", symbol: "Am", name: "A minor", frets: [-1, 0, 2, 2, 1, 0], fingers: [0, 0, 2, 3, 1, 0], baseFret: 1, tier: "open", tip: "Same shape as E major moved across one string." },
   { id: "Em", symbol: "Em", name: "E minor", frets: [0, 2, 2, 0, 0, 0], fingers: [0, 2, 3, 0, 0, 0], baseFret: 1, tier: "open", tip: "Two fingers, all six strings. The easiest full chord on the guitar." },
@@ -104,12 +111,28 @@ export function chordById(id: string): Chord | undefined {
 }
 
 /** The MIDI notes a strum of this shape actually sounds, low to high. */
-export function chordMidiNotes(chord: Chord): number[] {
+export function chordMidiNotes(chord: Chord, frets: number[] = chord.frets): number[] {
   const out: number[] = [];
-  chord.frets.forEach((fret, str) => {
+  frets.forEach((fret, str) => {
     if (fret >= 0) out.push(midiForFret(str, fret));
   });
   return out;
+}
+
+/** Every shape the microphone should accept as this chord, diagram first. */
+export function chordVoicings(chord: Chord): number[][] {
+  return [chord.frets, ...(chord.voicings ?? [])];
+}
+
+/** Whether every pitch class of `inner` is in `outer` — a heard D5 inside a wanted D. */
+export function chordIsSubset(inner: Chord, outer: Chord): boolean {
+  const outerSet = new Set(chordPitchClasses(outer));
+  return chordPitchClasses(inner).every((pc) => outerSet.has(pc));
+}
+
+/** Two pitch classes only: root and fifth. What a chord looks like with a weak third. */
+export function isPowerChord(chord: Chord): boolean {
+  return chordPitchClasses(chord).length === 2;
 }
 
 /** Which string indices sound, low to high. Needed to stagger a strum. */

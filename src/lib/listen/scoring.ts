@@ -16,6 +16,7 @@
  *   Slots whose window has closed with nothing matched are recorded as misses.
  */
 
+import { chordById, chordIsSubset } from "../music/chords";
 import { chordAtSlot, isAudible, slotSeconds, type Pattern } from "../music/pattern";
 import type { Onset } from "./detector";
 
@@ -133,6 +134,12 @@ export function estimateOffsetMs(ctx: AudioContext | null): number {
   const base = (ctx.baseLatency ?? 0) * 1000;
   const out = ((ctx as AudioContext & { outputLatency?: number }).outputLatency ?? 0) * 1000;
   return Math.round(base + out);
+}
+
+function heardWithin(heard: string | null, wanted: string): boolean {
+  const h = heard ? chordById(heard) : undefined;
+  const w = chordById(wanted);
+  return !!h && !!w && chordIsSubset(h, w);
 }
 
 export class Scorer {
@@ -293,10 +300,13 @@ export class Scorer {
     // The gate sits where the synthetic sweeps put it: at 0.55 no clean-strum
     // misidentification got through while ~80% of correct guesses did
     // (scripts/chord-match-eval.ts). Below it, silence beats accusation.
+    // A heard chord whose notes all belong to the wanted one (D5 for D, G5
+    // for G) is the wanted chord with a weak or muted third, not a wrong
+    // chord — that is what a real strum with a soft third reads as.
     const chordOk =
       best.wantStroke === "mute" || onset.chordConfidence < 0.55
         ? null
-        : onset.chordGuess === best.wantChord;
+        : onset.chordGuess === best.wantChord || heardWithin(onset.chordGuess, best.wantChord);
     const strokeOk =
       best.wantStroke === "mute" || onset.strokeConfidence < 0.4
         ? null
