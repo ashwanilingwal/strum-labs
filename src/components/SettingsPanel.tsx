@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { emptyPattern, newPatternId, type Pattern } from "@/lib/music/pattern";
 import type { AppState } from "@/lib/storage/settings";
 import type { MicStatus } from "@/hooks/useStrumEngine";
@@ -9,7 +9,8 @@ import { QUICK_ID, type DuckMode } from "@/lib/storage/settings";
 import type { Tone } from "@/lib/audio/engine";
 import { INSTRUMENTS, isInstrument } from "@/lib/audio/samples";
 import type { RoomProfile } from "@/lib/listen/detector";
-import type { SyncStatus } from "@/hooks/useAccount";
+import type { DeleteResult, SyncStatus } from "@/hooks/useAccount";
+import { Dialog } from "./ui/Dialog";
 import { Disclosure } from "./ui/Disclosure";
 import { PatternEditor } from "./PatternEditor";
 import { PracticePicker } from "./PracticePicker";
@@ -43,9 +44,16 @@ export function SettingsPanel({
     status: SyncStatus;
     signIn: () => void;
     signOut: () => void;
+    deleteAccount: () => Promise<DeleteResult>;
   };
 }) {
   const closeRef = useRef<HTMLButtonElement>(null);
+  // The two account dialogs: what signing in means (asked before the OAuth
+  // hop, because that is when the data is collected), and the deletion
+  // confirm. `note` is the one-line outcome shown in the panel afterwards.
+  const [dialog, setDialog] = useState<"signin" | "delete" | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -356,13 +364,95 @@ export function SettingsPanel({
                     <p className="text-xs text-fg-muted">
                       Your patterns are saved in this browser. Sign in to keep them across devices.
                     </p>
-                    <button type="button" className="btn btn-lit shrink-0 text-xs" onClick={account.signIn}>
+                    <button type="button" className="btn btn-lit shrink-0 text-xs" onClick={() => setDialog("signin")}>
                       Sign in
                     </button>
                   </div>
                 )}
+                {account.email ? (
+                  <button
+                    type="button"
+                    className="caps mt-3 text-fg-dim underline underline-offset-4 transition hover:text-accent"
+                    onClick={() => setDialog("delete")}
+                  >
+                    Delete account
+                  </button>
+                ) : null}
+                {note ? <p className="mt-2 text-xs text-fg-muted">{note}</p> : null}
               </div>
+              <p className="mt-2 px-1 text-xs text-fg-dim">
+                What an account stores, and what it doesn&apos;t:{" "}
+                <a href="/privacy" className="text-accent underline">privacy notice</a>.
+              </p>
             </section>
+          ) : null}
+
+          {dialog === "signin" ? (
+            <Dialog title="Sign in with Google?" icon="☁️" onClose={() => setDialog(null)} actions={
+              <>
+                <button type="button" className="btn text-xs" onClick={() => setDialog(null)}>
+                  Not now
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-lit text-xs"
+                  onClick={() => {
+                    setDialog(null);
+                    account.signIn();
+                  }}
+                >
+                  Continue with Google
+                </button>
+              </>
+            }>
+              <p>
+                Signing in makes a StrumLab account from the email address and name on your
+                Google account, and keeps a copy of your patterns, settings and level results on
+                our database (hosted by Supabase) so they follow you between devices.
+              </p>
+              <p>
+                That is everything it stores. No marketing, nothing shared, and you can delete
+                the lot from this panel whenever you like.{" "}
+                <a href="/privacy" className="text-accent underline">Privacy notice</a>.
+              </p>
+            </Dialog>
+          ) : null}
+
+          {dialog === "delete" ? (
+            <Dialog title="Delete your account?" icon="🗑️" onClose={() => (deleting ? undefined : setDialog(null))} actions={
+              <>
+                <button type="button" className="btn text-xs" disabled={deleting} onClick={() => setDialog(null)}>
+                  Keep it
+                </button>
+                <button
+                  type="button"
+                  className="btn text-xs"
+                  disabled={deleting}
+                  onClick={async () => {
+                    setDeleting(true);
+                    const result = await account.deleteAccount();
+                    setDeleting(false);
+                    setDialog(null);
+                    setNote(
+                      result === "deleted" ? "Your account and its synced copy are gone. This browser's copy is still here."
+                      : result === "unsupported" ? "Deletion isn't set up on this server yet — email the address on the privacy page and it will be done by hand."
+                      : "That didn't work. Check your connection and try again, or email the address on the privacy page.",
+                    );
+                  }}
+                >
+                  {deleting ? "Deleting…" : "Delete everything"}
+                </button>
+              </>
+            }>
+              <p>
+                This removes your account and the synced copy of your patterns, settings and
+                results from our database, straight away and for good.
+              </p>
+              <p>
+                The copy in this browser stays, so you can keep practising without an account.
+                Clear this site&apos;s data in your browser if you want that gone too.
+              </p>
+            </Dialog>
           ) : null}
         </div>
       </aside>

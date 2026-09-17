@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Bagel_Fat_One, Archivo, DM_Mono } from "next/font/google";
+import { PrivacyNotice } from "@/components/ui/PrivacyNotice";
 import "./globals.css";
 
 /**
@@ -25,7 +26,10 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${bagel.variable} ${archivo.variable} ${mono.variable} h-full antialiased`}>
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        {children}
+        <PrivacyNotice />
+      </body>
     </html>
   );
 }

@@ -23,14 +23,16 @@ change the architecture, change this file in the same commit.
 
 | Route | What it is | Component |
 | --- | --- | --- |
-| `/` | Cover — wordmark, one sentence, one button, legal link | `app/page.tsx` |
+| `/` | Cover — wordmark, one sentence, one button, legal + privacy links | `app/page.tsx` |
 | `/play` | The play screen. Four modes: Levels (the game, default), Chords, Patterns, Exercises | `components/StrumLab.tsx` |
 | `/learn` | Chord library + saved patterns as tabs (`?tab=`) | `components/learn/Learn.tsx` |
 | `/songs` | Follow-along song player, fingerpick or strum, live pace | `components/SongPlayer.tsx` |
 | `/tuner` | Tuner (its own time-domain DSP) | `components/Tuner.tsx` |
 | `/legal` | Every licensing position in plain words | `app/legal/page.tsx` |
+| `/privacy` | The GDPR/UK-GDPR privacy notice, same format as /legal, with a data-export button | `app/privacy/page.tsx` |
 | `/soundcheck` | Hidden: measures the master bus. Run after audio changes | `app/soundcheck/page.tsx` |
-| `/auth/callback` | Supabase OAuth landing (only server-rendered route) | `app/auth/callback/route.ts` |
+| `/auth/callback` | Supabase OAuth landing | `app/auth/callback/route.ts` |
+| `/api/account/delete` | POST: right to erasure — deletes the caller's strum_state row and auth user; needs `SUPABASE_SERVICE_ROLE_KEY` (501 without it) | `app/api/account/delete/route.ts` |
 
 Redirects (next.config.ts): `/chords` and `/patterns` → `/learn` tabs;
 `/game` → `/play`.
@@ -114,6 +116,24 @@ app is a one-file edit — it has survived two full palette swaps.
 `reviveState` is the trust boundary for anything from disk or cloud, `QUICK_ID`
 is the reserved slot every picker writes to (never a saved pattern). Supabase
 is optional: without env vars the sign-in UI simply doesn't render.
+
+## Privacy position (the code must keep it true)
+
+No analytics, ads, tracking or third-party scripts; fonts are bundled by
+next/font at build; samples are same-origin; mic audio never leaves the page.
+Local storage holds app state only. The only cookie is Supabase's session,
+and only after sign-in. That is why there is NO cookie-consent banner —
+nothing needs consent (PECR/ePrivacy exempt strictly necessary storage) —
+and the first-visit card (`ui/PrivacyNotice.tsx`, mounted in `app/layout.tsx`,
+flag `strumlab:v1:privacyNoticed`) is a notice with one "Got it" button.
+What IS in place: `/privacy` (Article 13 notice; its `CONTROLLER` constant
+holds the name/contact/date), a disclosure dialog BEFORE the Google OAuth
+hop (`SettingsPanel` → `ui/Dialog.tsx`), "Delete account" in the same panel
+(`useAccount.deleteAccount` → `/api/account/delete`), and "Download my data"
+on /privacy (`components/privacy/DownloadMyData.tsx`). Adding any new data
+flow — analytics, a new provider, a new stored field — means updating
+/privacy in the same commit, and if it needs consent, gating it on a real
+consent, not the notice card.
 
 ## Invariants
 

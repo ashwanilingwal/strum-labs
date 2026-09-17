@@ -51,6 +51,9 @@ export default function Page() {
             <Link href="/legal" className="caps text-accent underline underline-offset-4">
               Copyright &amp; licences
             </Link>
+            <Link href="/privacy" className="caps text-accent underline underline-offset-4">
+              Privacy
+            </Link>
           </div>
         </div>
       </section>

@@ -16,6 +16,8 @@ import { pullState, pushState } from "@/lib/storage/sync";
 const STAMP_KEY = "strumlab:v1:updatedAt";
 
 export type SyncStatus = "local" | "syncing" | "synced" | "error";
+/** How a deletion request ended. "unsupported" = this server has no service key. */
+export type DeleteResult = "deleted" | "unsupported" | "error";
 
 export function localStamp(): number {
   if (typeof window === "undefined") return 0;
@@ -102,6 +104,25 @@ export function useAccount(state: AppState) {
     });
   }, []);
 
+  // The right to erasure. The server route does the deleting (it needs the
+  // service key); this side only has to stop believing in the session after.
+  const deleteAccount = useCallback(async (): Promise<DeleteResult> => {
+    const supabase = supabaseBrowser();
+    if (!supabase) return "error";
+    let res: Response;
+    try {
+      res = await fetch("/api/account/delete", { method: "POST" });
+    } catch {
+      return "error";
+    }
+    if (res.status === 501) return "unsupported";
+    if (!res.ok) return "error";
+    await supabase.auth.signOut();
+    setUser(null);
+    setStatus("local");
+    return "deleted";
+  }, []);
+
   const signOut = useCallback(async () => {
     const supabase = supabaseBrowser();
     if (!supabase) return;
@@ -110,5 +131,5 @@ export function useAccount(state: AppState) {
     setStatus("local");
   }, []);
 
-  return { configured, user, status, signIn, signOut };
+  return { configured, user, status, signIn, signOut, deleteAccount };
 }

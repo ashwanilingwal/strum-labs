@@ -594,6 +594,7 @@ export function StrumLab() {
           status: account.status,
           signIn: () => void account.signIn(),
           signOut: () => void account.signOut(),
+          deleteAccount: account.deleteAccount,
         }}
       />
     </main>
@@ -647,7 +648,8 @@ function HeadphoneTip({ onClose }: { onClose: () => void }) {
         <p className="mt-2 text-sm leading-relaxed text-fg-muted">
           On speakers the microphone hears the metronome and the app&apos;s guitar as well as
           you, and has to work out which was which. Through headphones it hears only your
-          playing — so the timing and chord scoring are at their most accurate.
+          playing — so the timing and chord scoring are at their most accurate. Everything it
+          hears is analysed on this device and never uploaded.
         </p>
         <button ref={okRef} type="button" className="btn btn-lit mt-5 w-full sm:w-auto sm:px-8" onClick={onClose}>
           OK

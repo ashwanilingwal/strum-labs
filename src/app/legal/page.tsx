@@ -82,7 +82,7 @@ export default function Page() {
               StrumLab&rsquo;s source code is MIT-licensed. The one carve-out: the GPL-3 acoustic
               samples are bundled data, kept in their own directory and loaded like any other
               static asset — the ordinary mere-aggregation case, which is why the code&rsquo;s
-              licence is unaffected. Fonts are served under the Open Font License via Google Fonts.
+              licence is unaffected. The fonts are Google Fonts faces under the Open Font License, bundled at build time and served from this site — no request goes to Google when you visit.
             </p>
           </Section>
 
@@ -90,6 +90,8 @@ export default function Page() {
             <p>
               Everything the microphone hears is analysed in your browser and discarded. No audio
               is recorded, stored, or sent anywhere — there is no server that could receive it.
+              What the site does keep, and the optional account, are set out on the{" "}
+              <Link href="/privacy" className="text-accent underline">privacy page</Link>.
             </p>
           </Section>
 
